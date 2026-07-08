@@ -24,7 +24,7 @@ def setup_db():
             t2 = m.Tenant(tenant_code="iso-b", name="ISO B", plan_code="standard", status="active")
             db.add(t2)
             db.flush()
-        for tenant, email in [(t1, "admin@iso-a.test"), (t2, "admin@iso-b.test")]:
+        for tenant, email in [(t1, "admin@iso-a.example.com"), (t2, "admin@iso-b.example.com")]:
             user = db.query(m.User).filter(m.User.email == email).first()
             if not user:
                 db.add(m.User(
@@ -53,7 +53,7 @@ def _login(tenant_code: str, email: str) -> str:
 
 
 def test_tenant_a_cannot_read_tenant_b_patients(setup_db):
-    token_a = _login("iso-a", "admin@iso-a.test")
+    token_a = _login("iso-a", "admin@iso-a.example.com")
     r = client.get(
         "/api/v1/patients",
         headers={"Authorization": f"Bearer {token_a}", "X-Tenant-Code": "iso-a"},
@@ -64,7 +64,7 @@ def test_tenant_a_cannot_read_tenant_b_patients(setup_db):
     mrns = {p.get("mrn") for p in patients_a}
     assert "MRN-A-001" in mrns or len(mrns) >= 0
 
-    token_b = _login("iso-b", "admin@iso-b.test")
+    token_b = _login("iso-b", "admin@iso-b.example.com")
     r_b = client.get(
         "/api/v1/patients",
         headers={"Authorization": f"Bearer {token_b}", "X-Tenant-Code": "iso-b"},
@@ -75,7 +75,7 @@ def test_tenant_a_cannot_read_tenant_b_patients(setup_db):
 
 
 def test_expanded_api_catalog_available(setup_db):
-    token = _login("iso-a", "admin@iso-a.test")
+    token = _login("iso-a", "admin@iso-a.example.com")
     r = client.get(
         "/api/v1/platform/expanded-api",
         headers={"Authorization": f"Bearer {token}", "X-Tenant-Code": "iso-a"},
