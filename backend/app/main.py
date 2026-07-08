@@ -51,7 +51,8 @@ app.include_router(dedicated_router, prefix="/api/v1")
 
 @app.on_event("startup")
 def on_startup():
-    Base.metadata.create_all(bind=engine)
+    from app.db.schema_patches import apply_schema_patches
+    apply_schema_patches()
     from app.db.session import SessionLocal
     from app.services.modules import sync_platform_modules
     from app.db.demo_data import seed_demo_replay
@@ -59,7 +60,6 @@ def on_startup():
     try:
         sync_platform_modules(db, None)
         db.commit()
-        # Ensure demo tenant has full replay dataset after every deploy/restart
         tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
         if tenant:
             seed_demo_replay(db)

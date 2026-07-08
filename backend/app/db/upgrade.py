@@ -1,40 +1,34 @@
 """Upgrade seed data for existing databases."""
 import os
 import sqlalchemy as sa
-from app.db.session import SessionLocal, engine, Base
+from app.db.session import SessionLocal
 from app.models import entities as m
 from app.services.modules import sync_platform_modules
+from app.db.schema_patches import apply_schema_patches
 import app.models.entities  # noqa
 
 
-def _sqlite_add_column_if_missing(conn, table: str, column: str, col_type: str):
-    rows = conn.execute(sa.text(f"PRAGMA table_info({table})")).fetchall()
-    if not any(r[1] == column for r in rows):
-        conn.execute(sa.text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
-
-
 def upgrade():
-    Base.metadata.create_all(bind=engine)
-    with engine.begin() as conn:
-        if engine.dialect.name == "sqlite":
-            _sqlite_add_column_if_missing(conn, "users", "mfa_enabled", "BOOLEAN DEFAULT 0")
-            _sqlite_add_column_if_missing(conn, "users", "mfa_secret", "VARCHAR(255)")
-            _sqlite_add_column_if_missing(conn, "medicines", "stock_qty", "NUMERIC DEFAULT 0")
-            _sqlite_add_column_if_missing(conn, "lab_orders", "results", "JSON")
-            _sqlite_add_column_if_missing(conn, "radiology_orders", "encounter_id", "VARCHAR(36)")
-            _sqlite_add_column_if_missing(conn, "radiology_orders", "critical_flag", "BOOLEAN DEFAULT 0")
-            _sqlite_add_column_if_missing(conn, "radiology_orders", "scheduled_at", "DATETIME")
-            _sqlite_add_column_if_missing(conn, "pharmacy_dispenses", "prescription_line_id", "VARCHAR(36)")
-            _sqlite_add_column_if_missing(conn, "pharmacy_dispenses", "encounter_id", "VARCHAR(36)")
+    print("Applying schema patches...")
+    apply_schema_patches()
 
     db = SessionLocal()
     try:
-        sync_platform_modules(db, None)
+        # Bootstrap fresh database
         tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
         if not tenant:
-            print("No demo tenant — run full seed first")
-            db.commit()
+            print("No demo tenant — running full seed")
+            db.close()
+            from app.db.seed import seed
+            seed()
+            db = SessionLocal()
+            tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
+
+        if not tenant:
+            print("ERROR: seed did not create demo tenant")
             return
+
+        sync_platform_modules(db, None)
 
         admin = db.query(m.User).filter(m.User.is_super_admin == True).first()
         aid = admin.id if admin else None
@@ -78,7 +72,6 @@ def upgrade():
 
         db.commit()
 
-        # Load full demo replay dataset (patients, clinical, finance, all modules)
         try:
             from app.db.demo_data import seed_demo_replay
             force = os.getenv("DEMO_REPLAY_FORCE", "").lower() in ("1", "true", "yes")
@@ -89,6 +82,11 @@ def upgrade():
             traceback.print_exc()
 
         print("Upgrade complete")
+    except Exception as exc:
+        import traceback
+        print(f"Upgrade failed: {exc}")
+        traceback.print_exc()
+        raise
     finally:
         db.close()
 
