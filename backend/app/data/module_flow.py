@@ -95,7 +95,7 @@ MODULE_FLOW: dict[str, dict] = {
     },
     "identity-rbac-and-security": {
         "phase": "platform", "order": 2, "next": ["hospital-clinic-administration"],
-        "links": [{"label": "MFA settings", "route": "/settings/mfa"}],
+        "links": [{"label": "Identity desk", "route": "/identity-security"}, {"label": "MFA settings", "route": "/settings/mfa"}],
     },
     "hospital-clinic-administration": {
         "phase": "platform", "order": 3, "next": ["rooms-and-facilities"],
@@ -103,17 +103,19 @@ MODULE_FLOW: dict[str, dict] = {
     },
     "rooms-and-facilities": {
         "phase": "platform", "order": 4, "next": ["document-forms-and-templates"],
-        "links": [{"label": "Bed master", "route": "/masters"}],
+        "links": [{"label": "Rooms & beds", "route": "/rooms-facilities"}, {"label": "Bed master", "route": "/masters"}],
     },
     "document-forms-and-templates": {
         "phase": "platform", "order": 5, "next": ["data-governance-and-platform-ops"],
-        "links": [{"label": "Upload document", "route": "/modules/document-forms-and-templates"}],
+        "links": [{"label": "Documents desk", "route": "/documents"}],
     },
     "data-governance-and-platform-ops": {
         "phase": "platform", "order": 6, "next": ["integrations-and-interoperability"],
+        "links": [{"label": "Governance desk", "route": "/data-governance"}],
     },
     "integrations-and-interoperability": {
         "phase": "platform", "order": 7, "next": ["patient-registration-and-crm"],
+        "links": [{"label": "Integrations desk", "route": "/integrations"}],
     },
     "audit-trail-and-governance": {
         "phase": "analytics", "order": 2, "next": ["reports-bi-and-analytics"],
@@ -136,7 +138,7 @@ MODULE_FLOW: dict[str, dict] = {
     },
     "emergency-and-triage": {
         "phase": "front-office", "order": 4, "next": ["opd-clinical-workflow"],
-        "links": [{"label": "Triage module", "route": "/modules/emergency-and-triage"}],
+        "links": [{"label": "ED triage desk", "route": "/emergency"}],
     },
     "opd-clinical-workflow": {
         "phase": "clinical", "order": 2, "next": ["telemedicine-and-virtual-care"],
@@ -167,9 +169,11 @@ MODULE_FLOW: dict[str, dict] = {
     },
     "nursing-and-care-plans": {
         "phase": "inpatient", "order": 2, "next": ["operation-theatre-and-procedures"],
+        "links": [{"label": "Nursing tasks", "route": "/nursing"}],
     },
     "operation-theatre-and-procedures": {
         "phase": "inpatient", "order": 3, "next": ["billing-tariff-and-payments"],
+        "links": [{"label": "OT schedule", "route": "/operation-theatre"}],
     },
     "billing-tariff-and-payments": {
         "phase": "finance", "order": 1, "next": ["insurance-and-claims"],
@@ -181,6 +185,7 @@ MODULE_FLOW: dict[str, dict] = {
     },
     "revenue-cycle-management": {
         "phase": "finance", "order": 3, "next": ["disease-and-care-pathways"],
+        "links": [{"label": "RCM desk", "route": "/revenue-cycle"}],
     },
     "disease-and-care-pathways": {
         "phase": "care-programs", "order": 1, "next": ["chronic-disease-programs"],
@@ -188,31 +193,39 @@ MODULE_FLOW: dict[str, dict] = {
     },
     "chronic-disease-programs": {
         "phase": "care-programs", "order": 2, "next": ["physiotherapy-and-rehab"],
+        "links": [{"label": "Chronic care desk", "route": "/chronic-care"}],
     },
     "physiotherapy-and-rehab": {
         "phase": "care-programs", "order": 3, "next": ["post-treatment-patient-care"],
+        "links": [{"label": "Physiotherapy desk", "route": "/physiotherapy"}],
     },
     "post-treatment-patient-care": {
         "phase": "care-programs", "order": 4, "next": ["women-child-and-specialty-care"],
-        "links": [{"label": "Patient portal follow-up", "route": "/portal"}],
+        "links": [{"label": "Post-treatment desk", "route": "/post-treatment"}, {"label": "Patient portal", "route": "/portal"}],
     },
     "women-child-and-specialty-care": {
         "phase": "care-programs", "order": 5, "next": ["ambulance-and-transport"],
+        "links": [{"label": "Women & child care", "route": "/womens-child-care"}],
     },
     "ambulance-and-transport": {
         "phase": "operations", "order": 1, "next": ["diet-catering-and-housekeeping"],
+        "links": [{"label": "Ambulance dispatch", "route": "/ambulance"}],
     },
     "diet-catering-and-housekeeping": {
         "phase": "operations", "order": 2, "next": ["inventory-procurement-and-stores"],
+        "links": [{"label": "Diet & housekeeping", "route": "/diet-housekeeping"}],
     },
     "inventory-procurement-and-stores": {
         "phase": "operations", "order": 3, "next": ["provider-marketplace"],
+        "links": [{"label": "Inventory desk", "route": "/inventory"}],
     },
     "provider-marketplace": {
         "phase": "operations", "order": 4, "next": ["location-services"],
+        "links": [{"label": "Marketplace desk", "route": "/provider-marketplace"}],
     },
     "location-services": {
         "phase": "operations", "order": 5, "next": ["notifications-and-engagement"],
+        "links": [{"label": "Location tracking", "route": "/location-services"}],
     },
     "notifications-and-engagement": {
         "phase": "engagement", "order": 1, "next": ["mobile-apps"],
@@ -220,6 +233,7 @@ MODULE_FLOW: dict[str, dict] = {
     },
     "mobile-apps": {
         "phase": "engagement", "order": 3, "next": ["reports-bi-and-analytics"],
+        "links": [{"label": "Mobile apps config", "route": "/mobile-apps"}],
     },
     "reports-bi-and-analytics": {
         "phase": "analytics", "order": 1, "next": ["audit-trail-and-governance"],
@@ -254,9 +268,7 @@ def resolve_route(module_code: str) -> str:
     cat = _CATALOG_BY_CODE.get(module_code)
     if not cat:
         return f"/modules/{module_code}"
-    if cat.get("dedicated"):
-        return cat["route"]
-    return cat.get("route") or f"/modules/{module_code}"
+    return cat.get("route") or f"/module-map"
 
 
 def build_module_flow_response() -> dict:

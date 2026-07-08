@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { MODULE_CATALOG } from "../data/moduleCatalog";
+
+const MODULE_ROUTES = Object.fromEntries(MODULE_CATALOG.map((m) => [m.code, m.route]));
 
 export default function ReportsPage() {
   const [reports, setReports] = useState<any[]>([]);
@@ -24,7 +27,7 @@ export default function ReportsPage() {
       {error && <div className="error">{error}</div>}
       <div className="kpi-grid">
         {reports.map((r) => (
-          <div key={r.code} className="kpi" onClick={() => r.module_code && navigate(`/modules/${r.module_code}`)} role="button" tabIndex={0}>
+          <div key={r.code} className="kpi" onClick={() => r.module_code && navigate(MODULE_ROUTES[r.module_code] || "/module-map")} role="button" tabIndex={0}>
             <div className="value">{r.code}</div>
             <div className="label">{r.name}</div>
             <div className="muted" style={{ fontSize: "0.75rem" }}>{r.audience}</div>

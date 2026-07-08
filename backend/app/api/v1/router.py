@@ -1076,6 +1076,33 @@ def create_location_event(payload: LocationEventCreate, ctx: AuthContext = Depen
     return {"id": str(row.id)}
 
 
+@router.get("/location/events")
+def list_location_events(
+    purpose_code: str = "",
+    ctx: AuthContext = Depends(require_tenant),
+    db: Session = Depends(get_db),
+):
+    q = db.query(m.LocationEvent).filter(
+        m.LocationEvent.tenant_id == ctx.tenant_id,
+        m.LocationEvent.is_deleted == False,
+    )
+    if purpose_code:
+        q = q.filter(m.LocationEvent.purpose_code == purpose_code)
+    rows = q.order_by(m.LocationEvent.created_at.desc()).limit(100).all()
+    return [
+        {
+            "id": str(r.id),
+            "patient_id": str(r.patient_id) if r.patient_id else None,
+            "purpose_code": r.purpose_code,
+            "latitude": float(r.latitude) if r.latitude is not None else None,
+            "longitude": float(r.longitude) if r.longitude is not None else None,
+            "accuracy_m": r.accuracy_m,
+            "created_at": r.created_at,
+        }
+        for r in rows
+    ]
+
+
 # ───────────────────────── Billing stubs ─────────────────────────
 @router.post("/billing/estimates")
 def create_estimate(payload: InvoiceCreate, ctx: AuthContext = Depends(require_permission("billing:*")), db: Session = Depends(get_db)):

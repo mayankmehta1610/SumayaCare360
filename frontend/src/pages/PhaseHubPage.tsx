@@ -92,11 +92,6 @@ export default function PhaseHubPage() {
                 <Link to={`${prefix}${mod.route}`} className="button-link">
                   Open module
                 </Link>
-                {!mod.is_dedicated && (
-                  <Link to={`${prefix}/modules/${mod.code}`} className="secondary button-link">
-                    Workflow records
-                  </Link>
-                )}
               </div>
               {mod.quick_links.length > 0 && (
                 <div className="flow-quick-links">

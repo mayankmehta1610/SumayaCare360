@@ -15,9 +15,9 @@ type LabOrder = {
 };
 
 const NEXT_STATUS: Record<string, string> = {
-  ordered: "collected",
-  collected: "in_progress",
-  in_progress: "completed",
+  ordered: "sample_collected",
+  sample_collected: "result_entered",
+  result_entered: "verified",
 };
 
 export default function LaboratoryPage() {
@@ -52,8 +52,10 @@ export default function LaboratoryPage() {
 
   async function createOrder(e: FormEvent) {
     e.preventDefault();
-    const q = new URLSearchParams({ patient_id: form.patient_id, test_code: form.test_code });
-    await api(`/clinical/lab-orders?${q}`, { method: "POST" });
+    await api("/clinical/lab-orders", {
+      method: "POST",
+      body: JSON.stringify({ patient_id: form.patient_id, test_code: form.test_code }),
+    });
     setMsg("Lab order created");
     setForm({ patient_id: "", test_code: "" });
     await load();
@@ -62,38 +64,34 @@ export default function LaboratoryPage() {
   async function advanceStatus(order: LabOrder) {
     const next = NEXT_STATUS[order.status];
     if (!next) return;
-    await api(`/clinical/lab-orders/${order.id}?status=${next}`, { method: "PATCH" });
+    await api(`/clinical/lab-orders/${order.id}/status?status=${next}`, { method: "PATCH" });
     setMsg(`Order ${order.order_no} → ${next}`);
-    await load();
-  }
-
-  async function cancelOrder(id: string) {
-    await api(`/clinical/lab-orders/${id}?status=cancelled`, { method: "PATCH" });
-    setMsg("Order cancelled");
     await load();
   }
 
   async function saveResult(e: FormEvent) {
     e.preventDefault();
-    const q = new URLSearchParams({
-      status: "completed",
-      result_value: resultForm.result_value,
-      result_notes: resultForm.result_notes,
-      critical_flag: String(resultForm.critical_flag),
+    await api(`/clinical/lab-orders/${resultForm.orderId}/results`, {
+      method: "POST",
+      body: JSON.stringify({
+        result_value: resultForm.result_value,
+        result_notes: resultForm.result_notes,
+        critical_flag: resultForm.critical_flag,
+        results: { value: resultForm.result_value },
+      }),
     });
-    await api(`/clinical/lab-orders/${resultForm.orderId}?${q}`, { method: "PATCH" });
-    setMsg("Results saved");
+    setMsg("Results entered");
     setResultForm({ orderId: "", result_value: "", result_notes: "", critical_flag: false });
     await load();
   }
 
-  const pending = orders.filter((o) => !["completed", "cancelled"].includes(o.status));
+  const active = orders.filter((o) => !["verified", "critical_alert"].includes(o.status));
 
   return (
     <div>
       <ModuleFlowBar moduleCode="laboratory-and-diagnostics" compact />
       <h1 className="page-title">Laboratory & diagnostics</h1>
-      <p className="muted">Order tests from masters · sample collection · result entry · critical flags</p>
+      <p className="muted">ordered → sample_collected → result_entered → verified / critical_alert</p>
       <div className="actions" style={{ marginBottom: "1rem" }}>
         <Link to="/clinical-hub" className="secondary button-link">Clinical hub</Link>
         <Link to="/radiology" className="secondary button-link">Radiology</Link>
@@ -129,14 +127,14 @@ export default function LaboratoryPage() {
         <form className="card" onSubmit={(e) => saveResult(e).catch((err) => setError(err.message))}>
           <h3 style={{ marginTop: 0 }}>Result entry</h3>
           <div className="field">
-            <label>Order</label>
+            <label>Order (sample collected)</label>
             <select
               required
               value={resultForm.orderId}
               onChange={(e) => setResultForm({ ...resultForm, orderId: e.target.value })}
             >
-              <option value="">Select in-progress order</option>
-              {orders.filter((o) => ["in_progress", "collected"].includes(o.status)).map((o) => (
+              <option value="">Select</option>
+              {orders.filter((o) => o.status === "sample_collected").map((o) => (
                 <option key={o.id} value={o.id}>{o.order_no} — {o.test_code}</option>
               ))}
             </select>
@@ -153,42 +151,29 @@ export default function LaboratoryPage() {
             <input type="checkbox" checked={resultForm.critical_flag} onChange={(e) => setResultForm({ ...resultForm, critical_flag: e.target.checked })} />
             Critical result
           </label>
-          <button type="submit">Save & complete</button>
+          <button type="submit">Enter results</button>
         </form>
       </div>
 
       <div className="card table-wrap" style={{ marginTop: "1rem" }}>
-        <h3 style={{ marginTop: 0 }}>Lab orders ({pending.length} active)</h3>
+        <h3 style={{ marginTop: 0 }}>Lab orders ({active.length} active)</h3>
         <table>
           <thead>
-            <tr>
-              <th>Order</th>
-              <th>Patient</th>
-              <th>Test</th>
-              <th>Status</th>
-              <th>Result</th>
-              <th>Actions</th>
-            </tr>
+            <tr><th>Order</th><th>Patient</th><th>Test</th><th>Status</th><th>Result</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {orders.map((o) => (
               <tr key={o.id}>
                 <td>{o.order_no}</td>
-                <td>{patientMap.get(o.patient_id) || o.patient_id.slice(0, 8)}</td>
+                <td>{patientMap.get(o.patient_id) || "—"}</td>
                 <td>{o.test_code}</td>
-                <td>
-                  <span className="badge">{o.status}</span>
-                  {o.critical_flag && <span className="badge" style={{ marginLeft: "0.25rem" }}>critical</span>}
-                </td>
+                <td><span className="badge">{o.status}</span></td>
                 <td>{o.result_value || "—"}</td>
                 <td className="actions">
                   {NEXT_STATUS[o.status] && (
                     <button type="button" className="secondary" onClick={() => advanceStatus(o).catch((e) => setError(e.message))}>
                       → {NEXT_STATUS[o.status]}
                     </button>
-                  )}
-                  {!["completed", "cancelled"].includes(o.status) && (
-                    <button type="button" className="secondary" onClick={() => cancelOrder(o.id).catch((e) => setError(e.message))}>Cancel</button>
                   )}
                 </td>
               </tr>

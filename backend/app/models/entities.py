@@ -715,3 +715,40 @@ class DocumentMetadata(Base, AuditedMixin):
     storage_key = Column(String(512), nullable=False)
     size_bytes = Column(Integer, default=0)
     status = Column(String(32), default="active")
+
+
+class TriageAssessment(Base, AuditedMixin):
+    __tablename__ = "triage_assessments"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False, index=True)
+    triage_no = Column(String(64), nullable=False)
+    chief_complaint = Column(Text)
+    esi_level = Column(Integer, default=3)
+    status = Column(String(32), default="arrived")
+    disposition = Column(String(64))
+    notes = Column(Text)
+    arrived_at = Column(DateTime(timezone=True), default=utcnow)
+    triaged_at = Column(DateTime(timezone=True), nullable=True)
+    disposition_at = Column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (
+        Index("ix_triage_search", "tenant_id", "status", "esi_level", "arrived_at"),
+    )
+
+
+class OtProcedure(Base, AuditedMixin):
+    __tablename__ = "ot_procedures"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False, index=True)
+    procedure_no = Column(String(64), nullable=False)
+    procedure_code = Column(String(64), nullable=False)
+    procedure_name = Column(String(255), nullable=False)
+    surgeon_id = Column(GUID(), ForeignKey("providers.id"), nullable=True)
+    theatre_code = Column(String(64))
+    status = Column(String(32), default="scheduled")
+    scheduled_at = Column(DateTime(timezone=True), nullable=True)
+    pre_op_checklist = Column(JSON, default=dict)
+    intra_op_notes = Column(Text)
+    implant_tracking = Column(JSON, default=list)
+    __table_args__ = (
+        Index("ix_ot_search", "tenant_id", "status", "scheduled_at"),
+    )

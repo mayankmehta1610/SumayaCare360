@@ -11,16 +11,7 @@ type Claim = {
   amount: number;
   patient_id: string;
   policy_no?: string;
-};
-
-const STATUS_ACTIONS: Record<string, { label: string; next: string }[]> = {
-  draft: [{ label: "Submit", next: "submitted" }],
-  submitted: [{ label: "Review", next: "under_review" }],
-  under_review: [
-    { label: "Approve", next: "approved" },
-    { label: "Deny", next: "denied" },
-  ],
-  approved: [{ label: "Mark paid", next: "paid" }],
+  allowed_next_statuses?: string[];
 };
 
 export default function InsuranceClaimsPage() {
@@ -41,7 +32,7 @@ export default function InsuranceClaimsPage() {
     const [p, py, cl] = await Promise.all([
       api<any[]>("/patients"),
       api<any[]>("/masters/insurance-payers"),
-      api<Claim[]>("/clinical/insurance-claims"),
+      api<Claim[]>("/finance/claims"),
     ]);
     setPatients(p);
     setPayers(py);
@@ -54,103 +45,104 @@ export default function InsuranceClaimsPage() {
 
   async function submitClaim(e: FormEvent) {
     e.preventDefault();
-    const q = new URLSearchParams({
-      patient_id: form.patient_id,
-      payer_code: form.payer_code,
-      amount: form.amount,
-      policy_no: form.policy_no,
+    await api("/finance/claims", {
+      method: "POST",
+      body: JSON.stringify({
+        patient_id: form.patient_id,
+        payer_code: form.payer_code,
+        amount: Number(form.amount),
+        policy_no: form.policy_no,
+      }),
     });
-    await api(`/clinical/insurance-claims?${q}`, { method: "POST" });
     setMsg("Claim created (draft)");
     await load();
   }
 
-  async function transition(id: string, status: string) {
-    await api(`/clinical/insurance-claims/${id}/status?status=${status}`, { method: "PATCH" });
+  async function preAuth() {
+    if (!form.patient_id || !form.payer_code) return;
+    const res = await api<{ approved: boolean; reference: string }>("/finance/claims/pre-auth-check", {
+      method: "POST",
+      body: JSON.stringify({
+        patient_id: form.patient_id,
+        payer_code: form.payer_code,
+        amount: Number(form.amount),
+        policy_no: form.policy_no,
+      }),
+    });
+    setMsg(`Pre-auth ${res.approved ? "approved" : "denied"} — ref ${res.reference}`);
+  }
+
+  async function setStatus(id: string, status: string) {
+    await api(`/finance/claims/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
     setMsg(`Claim → ${status}`);
     await load();
   }
-
-  const openClaims = claims.filter((c) => !["paid", "denied"].includes(c.status));
 
   return (
     <div>
       <ModuleFlowBar moduleCode="insurance-and-claims" compact />
       <h1 className="page-title">Insurance & claims</h1>
-      <p className="muted">Submit claims · payer master · status workflow through settlement</p>
+      <p className="muted">draft → submitted → under_review → approved/denied → paid</p>
       <div className="actions" style={{ marginBottom: "1rem" }}>
         <Link to="/billing" className="secondary button-link">Billing</Link>
-        <Link to="/masters" className="secondary button-link">Insurance payers</Link>
+        <Link to="/hubs/finance" className="secondary button-link">Finance hub</Link>
       </div>
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
 
-      <div className="grid-2">
-        <form className="card" onSubmit={(e) => submitClaim(e).catch((err) => setError(err.message))}>
-          <h3 style={{ marginTop: 0 }}>New claim</h3>
+      <form className="card" onSubmit={(e) => submitClaim(e).catch((err) => setError(err.message))}>
+        <h3 style={{ marginTop: 0 }}>New claim</h3>
+        <div className="grid-2">
           <div className="field">
             <label>Patient</label>
             <select required value={form.patient_id} onChange={(e) => setForm({ ...form, patient_id: e.target.value })}>
               <option value="">Select</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>
-              ))}
+              {patients.map((p) => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
             </select>
           </div>
           <div className="field">
-            <label>Payer (master)</label>
+            <label>Payer</label>
             <select required value={form.payer_code} onChange={(e) => setForm({ ...form, payer_code: e.target.value })}>
               <option value="">Select</option>
-              {payers.map((p) => (
-                <option key={p.code} value={p.code}>{p.name}</option>
-              ))}
+              {payers.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
             </select>
+          </div>
+        </div>
+        <div className="grid-2">
+          <div className="field">
+            <label>Amount</label>
+            <input type="number" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           </div>
           <div className="field">
             <label>Policy no</label>
             <input value={form.policy_no} onChange={(e) => setForm({ ...form, policy_no: e.target.value })} />
           </div>
-          <div className="field">
-            <label>Amount (₹)</label>
-            <input type="number" required min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-          </div>
-          <button type="submit">Create claim</button>
-        </form>
-
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Workflow</h3>
-          <p className="muted" style={{ marginTop: 0 }}>
-            draft → submitted → under_review → approved/denied → paid
-          </p>
-          <p><strong>{openClaims.length}</strong> open claims</p>
-          <p><strong>{claims.filter((c) => c.status === "paid").length}</strong> settled</p>
         </div>
-      </div>
+        <div className="actions">
+          <button type="submit">Create claim</button>
+          <button type="button" className="secondary" onClick={() => preAuth().catch((e) => setError(e.message))}>Pre-auth check</button>
+        </div>
+      </form>
 
       <div className="card table-wrap" style={{ marginTop: "1rem" }}>
-        <h3 style={{ marginTop: 0 }}>Claims</h3>
+        <h3 style={{ marginTop: 0 }}>Claims pipeline</h3>
         <table>
-          <thead>
-            <tr><th>Claim</th><th>Patient</th><th>Payer</th><th>Policy</th><th>Amount</th><th>Status</th><th>Actions</th></tr>
-          </thead>
+          <thead><tr><th>Claim</th><th>Patient</th><th>Payer</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             {claims.map((c) => (
               <tr key={c.id}>
                 <td>{c.claim_no}</td>
-                <td>{patientMap.get(c.patient_id) || c.patient_id.slice(0, 8)}</td>
+                <td>{patientMap.get(c.patient_id) || "—"}</td>
                 <td>{c.payer_code}</td>
-                <td>{c.policy_no || "—"}</td>
                 <td>₹{c.amount}</td>
                 <td><span className="badge">{c.status}</span></td>
                 <td className="actions">
-                  {(STATUS_ACTIONS[c.status] || []).map((a) => (
-                    <button
-                      key={a.next}
-                      type="button"
-                      className="secondary"
-                      onClick={() => transition(c.id, a.next).catch((e) => setError(e.message))}
-                    >
-                      {a.label}
+                  {(c.allowed_next_statuses || []).map((s) => (
+                    <button key={s} type="button" className="secondary" onClick={() => setStatus(c.id, s).catch((e) => setError(e.message))}>
+                      → {s}
                     </button>
                   ))}
                 </td>

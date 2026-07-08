@@ -28,7 +28,7 @@ export default function ClinicalHubPage() {
       api<any[]>("/masters/insurance-payers"),
       api<any[]>("/clinical/lab-orders"),
       api<any[]>("/clinical/ipd-admissions"),
-      api<any[]>("/clinical/insurance-claims"),
+      api<any[]>("/finance/claims"),
     ]);
     setPatients(p);
     setTests(t);
@@ -45,8 +45,10 @@ export default function ClinicalHubPage() {
 
   async function orderLab(e: FormEvent) {
     e.preventDefault();
-    const q = new URLSearchParams({ patient_id: labForm.patient_id, test_code: labForm.test_code });
-    await api(`/clinical/lab-orders?${q}`, { method: "POST" });
+    await api("/clinical/lab-orders", {
+      method: "POST",
+      body: JSON.stringify({ patient_id: labForm.patient_id, test_code: labForm.test_code }),
+    });
     setMsg("Lab order created");
     await load();
   }
@@ -67,13 +69,15 @@ export default function ClinicalHubPage() {
 
   async function submitClaim(e: FormEvent) {
     e.preventDefault();
-    const q = new URLSearchParams({
-      patient_id: claimForm.patient_id,
-      payer_code: claimForm.payer_code,
-      amount: claimForm.amount,
-      policy_no: claimForm.policy_no,
+    await api("/finance/claims", {
+      method: "POST",
+      body: JSON.stringify({
+        patient_id: claimForm.patient_id,
+        payer_code: claimForm.payer_code,
+        amount: Number(claimForm.amount),
+        policy_no: claimForm.policy_no,
+      }),
     });
-    await api(`/clinical/insurance-claims?${q}`, { method: "POST" });
     setMsg("Claim submitted");
     await load();
   }

@@ -57,11 +57,6 @@ export default function ModuleMapPage() {
                 <Link to={`${prefix}${mod.route}`} className="flow-timeline-label">
                   {mod.name}
                 </Link>
-                {!mod.is_dedicated && (
-                  <Link to={`${prefix}/modules/${mod.code}`} className="flow-timeline-sub muted">
-                    records
-                  </Link>
-                )}
               </div>
             ))}
           </div>

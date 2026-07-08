@@ -74,7 +74,7 @@ export default function BillingPage() {
       <p className="muted">Invoices auto-created on OPD/IPD discharge. Manual invoices also supported. Payments use gateway tokens only (PCI).</p>
       <div className="actions" style={{ marginBottom: "1rem" }}>
         <Link to="/insurance-claims" className="secondary button-link">Insurance claims</Link>
-        <Link to="/modules/revenue-cycle-management" className="secondary button-link">Revenue cycle</Link>
+        <Link to="/revenue-cycle" className="secondary button-link">Revenue cycle</Link>
         <Link to="/hubs/finance" className="secondary button-link">Finance hub</Link>
       </div>
       {error && <div className="error">{error}</div>}

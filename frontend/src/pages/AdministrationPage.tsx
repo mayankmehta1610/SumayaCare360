@@ -31,9 +31,8 @@ export default function AdministrationPage() {
       <ModuleFlowBar moduleCode="hospital-clinic-administration" compact />
       <h1 className="page-title">Hospital / Clinic Administration</h1>
       <div className="actions" style={{ marginBottom: "1rem" }}>
-        <Link to="/modules/hospital-clinic-administration" className="secondary button-link">Admin workflows</Link>
-        <Link to="/modules/rooms-and-facilities" className="secondary button-link">Rooms & facilities</Link>
-        <Link to="/modules/identity-rbac-and-security" className="secondary button-link">Users & RBAC</Link>
+        <Link to="/rooms-facilities" className="secondary button-link">Rooms & facilities</Link>
+        <Link to="/identity-security" className="secondary button-link">Users & RBAC</Link>
         <Link to="/masters" className="secondary button-link">Masters</Link>
         <Link to="/hubs/platform" className="secondary button-link">Platform hub</Link>
       </div>

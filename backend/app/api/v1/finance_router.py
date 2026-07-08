@@ -48,7 +48,14 @@ def list_claims(
     db: Session = Depends(get_db),
 ):
     rows = fin.list_claims(db, ctx.tenant_id, status=status)
-    return [fin.serialize_claim(r) for r in rows]
+    out = []
+    for r in rows:
+        item = fin.serialize_claim(r)
+        item["allowed_next_statuses"] = allowed_next_statuses(
+            db, fin.CLAIM_MODULE, r.status, tenant_id=ctx.tenant_id,
+        )
+        out.append(item)
+    return out
 
 
 @router.post("/claims")

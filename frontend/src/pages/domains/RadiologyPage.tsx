@@ -16,9 +16,8 @@ type RadOrder = {
 const STUDIES = ["XRAY-CHEST", "USG-ABD", "CT-HEAD", "MRI-SPINE", "MAMMO-SCREEN"];
 const NEXT_STATUS: Record<string, string> = {
   ordered: "scheduled",
-  scheduled: "in_progress",
-  in_progress: "reported",
-  reported: "completed",
+  scheduled: "acquired",
+  acquired: "reported",
 };
 
 export default function RadiologyPage() {
@@ -49,8 +48,10 @@ export default function RadiologyPage() {
 
   async function createOrder(e: FormEvent) {
     e.preventDefault();
-    const q = new URLSearchParams({ patient_id: form.patient_id, study_code: form.study_code });
-    await api(`/clinical/radiology-orders?${q}`, { method: "POST" });
+    await api("/clinical/radiology-orders", {
+      method: "POST",
+      body: JSON.stringify({ patient_id: form.patient_id, study_code: form.study_code }),
+    });
     setMsg("Imaging order created");
     await load();
   }
@@ -58,15 +59,20 @@ export default function RadiologyPage() {
   async function advanceStatus(order: RadOrder) {
     const next = NEXT_STATUS[order.status];
     if (!next) return;
-    await api(`/clinical/radiology-orders/${order.id}?status=${next}`, { method: "PATCH" });
+    await api(`/clinical/radiology-orders/${order.id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: next }),
+    });
     setMsg(`Order ${order.order_no} → ${next}`);
     await load();
   }
 
   async function saveReport(e: FormEvent) {
     e.preventDefault();
-    const q = new URLSearchParams({ status: "reported", report_text: reportText, pacs_link: pacsLink });
-    await api(`/clinical/radiology-orders/${reportId}?${q}`, { method: "PATCH" });
+    await api(`/clinical/radiology-orders/${reportId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "reported", report_text: reportText, pacs_link: pacsLink }),
+    });
     setMsg("Report saved");
     setReportId("");
     setReportText("");
@@ -74,17 +80,11 @@ export default function RadiologyPage() {
     await load();
   }
 
-  async function cancelOrder(id: string) {
-    await api(`/clinical/radiology-orders/${id}?status=cancelled`, { method: "PATCH" });
-    setMsg("Order cancelled");
-    await load();
-  }
-
   return (
     <div>
       <ModuleFlowBar moduleCode="radiology-and-imaging" compact />
       <h1 className="page-title">Radiology & imaging</h1>
-      <p className="muted">Imaging order lifecycle · scheduling · reporting · PACS link</p>
+      <p className="muted">ordered → scheduled → acquired → reported / critical</p>
       <div className="actions" style={{ marginBottom: "1rem" }}>
         <Link to="/laboratory" className="secondary button-link">Laboratory</Link>
         <Link to="/pharmacy" className="secondary button-link">Pharmacy</Link>
@@ -114,12 +114,12 @@ export default function RadiologyPage() {
         </form>
 
         <form className="card" onSubmit={(e) => saveReport(e).catch((err) => setError(err.message))}>
-          <h3 style={{ marginTop: 0 }}>Report dictation</h3>
+          <h3 style={{ marginTop: 0 }}>Dictate report</h3>
           <div className="field">
-            <label>Order</label>
+            <label>Order (acquired)</label>
             <select required value={reportId} onChange={(e) => setReportId(e.target.value)}>
-              <option value="">Select order</option>
-              {orders.filter((o) => ["in_progress", "scheduled"].includes(o.status)).map((o) => (
+              <option value="">Select</option>
+              {orders.filter((o) => o.status === "acquired").map((o) => (
                 <option key={o.id} value={o.id}>{o.order_no} — {o.study_code}</option>
               ))}
             </select>
@@ -130,9 +130,9 @@ export default function RadiologyPage() {
           </div>
           <div className="field">
             <label>PACS link</label>
-            <input value={pacsLink} onChange={(e) => setPacsLink(e.target.value)} placeholder="https://pacs.example/study/..." />
+            <input value={pacsLink} onChange={(e) => setPacsLink(e.target.value)} placeholder="https://pacs..." />
           </div>
-          <button type="submit">Save report</button>
+          <button type="submit">Finalize report</button>
         </form>
       </div>
 
@@ -140,24 +140,20 @@ export default function RadiologyPage() {
         <h3 style={{ marginTop: 0 }}>Imaging orders</h3>
         <table>
           <thead>
-            <tr><th>Order</th><th>Patient</th><th>Study</th><th>Status</th><th>Report</th><th>Actions</th></tr>
+            <tr><th>Order</th><th>Patient</th><th>Study</th><th>Status</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {orders.map((o) => (
               <tr key={o.id}>
                 <td>{o.order_no}</td>
-                <td>{patientMap.get(o.patient_id) || o.patient_id.slice(0, 8)}</td>
+                <td>{patientMap.get(o.patient_id) || "—"}</td>
                 <td>{o.study_code}</td>
                 <td><span className="badge">{o.status}</span></td>
-                <td>{o.report_text ? o.report_text.slice(0, 40) + "…" : "—"}</td>
                 <td className="actions">
                   {NEXT_STATUS[o.status] && (
                     <button type="button" className="secondary" onClick={() => advanceStatus(o).catch((e) => setError(e.message))}>
                       → {NEXT_STATUS[o.status]}
                     </button>
-                  )}
-                  {!["completed", "cancelled"].includes(o.status) && (
-                    <button type="button" className="secondary" onClick={() => cancelOrder(o.id).catch((e) => setError(e.message))}>Cancel</button>
                   )}
                 </td>
               </tr>

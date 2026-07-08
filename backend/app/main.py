@@ -10,6 +10,9 @@ from app.api.v1.clinical_router import router as clinical_router
 from app.api.v1.finance_router import router as finance_router
 from app.api.v1.pathways_router import router as pathways_router
 from app.api.v1.masters_router import router as masters_router
+from app.api.v1.emergency_router import router as emergency_router
+from app.api.v1.ot_router import router as ot_router
+from app.api.v1.dedicated_router import router as dedicated_router
 from app.middleware.api_audit import ApiAuditMiddleware
 from app.db.session import Base, engine
 import app.models.entities  # noqa: F401 — register models
@@ -40,6 +43,9 @@ app.include_router(portal_router, prefix="/api/v1")
 app.include_router(docs_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
 app.include_router(clinical_router, prefix="/api/v1")
+app.include_router(emergency_router, prefix="/api/v1")
+app.include_router(ot_router, prefix="/api/v1")
+app.include_router(dedicated_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
