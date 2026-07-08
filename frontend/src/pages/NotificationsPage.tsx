@@ -1,14 +1,35 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
+import ModuleFlowBar from "../components/ModuleFlowBar";
+
+type OutboxRow = {
+  id: string;
+  channel: string;
+  recipient: string;
+  subject?: string;
+  body: string;
+  status: string;
+  created_at?: string;
+};
 
 export default function NotificationsPage() {
   const [templates, setTemplates] = useState<any[]>([]);
+  const [outbox, setOutbox] = useState<OutboxRow[]>([]);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ channel: "email", recipient: "", subject: "", body: "" });
 
+  async function load() {
+    const [t, o] = await Promise.all([
+      api<any[]>("/masters/notification-templates"),
+      api<OutboxRow[]>("/notifications/outbox"),
+    ]);
+    setTemplates(t);
+    setOutbox(o);
+  }
+
   useEffect(() => {
-    api<any[]>("/masters/notification-templates").then(setTemplates).catch((e) => setError(e.message));
+    load().catch((e) => setError(e.message));
   }, []);
 
   function useTemplate(t: any) {
@@ -32,11 +53,14 @@ export default function NotificationsPage() {
       }),
     });
     setMsg("Notification queued");
+    await load();
   }
 
   return (
     <div>
-      <h1 className="page-title">Notifications & Engagement</h1>
+      <ModuleFlowBar moduleCode="notifications-and-engagement" compact />
+      <h1 className="page-title">Notifications & engagement</h1>
+      <p className="muted">SMS · email · WhatsApp · push — loaded from PostgreSQL outbox</p>
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
       <div className="grid-2">
@@ -47,6 +71,7 @@ export default function NotificationsPage() {
               <option value="email">Email</option>
               <option value="sms">SMS</option>
               <option value="whatsapp">WhatsApp</option>
+              <option value="push">Push</option>
             </select>
           </div>
           <div className="field"><label>Recipient</label>
@@ -70,6 +95,23 @@ export default function NotificationsPage() {
             </div>
           ))}
         </div>
+      </div>
+      <div className="card table-wrap" style={{ marginTop: "1rem" }}>
+        <h3 style={{ marginTop: 0 }}>Outbox ({outbox.length})</h3>
+        <table>
+          <thead><tr><th>Channel</th><th>Recipient</th><th>Subject</th><th>Status</th><th>Time</th></tr></thead>
+          <tbody>
+            {outbox.map((r) => (
+              <tr key={r.id}>
+                <td>{r.channel}</td>
+                <td>{r.recipient}</td>
+                <td>{r.subject}</td>
+                <td><span className="badge">{r.status}</span></td>
+                <td>{r.created_at ? new Date(r.created_at).toLocaleString() : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

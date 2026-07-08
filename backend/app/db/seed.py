@@ -161,6 +161,15 @@ def seed():
             body="Dear {{patient_name}}, your appointment is at {{time}}.",
             created_by=super_admin.id, updated_by=super_admin.id,
         ))
+        for code, ch, subj, body in [
+            ("LAB_READY", "sms", "Lab Result", "Your lab result for {{test}} is ready."),
+            ("DISCHARGE", "whatsapp", "Discharge", "Discharge summary available in patient portal."),
+            ("PAYMENT_RCPT", "email", "Payment Receipt", "Payment of ₹{{amount}} received. Thank you."),
+        ]:
+            db.add(m.NotificationTemplate(
+                tenant_id=tenant.id, code=code, channel=ch, subject=subj, body=body,
+                created_by=super_admin.id, updated_by=super_admin.id,
+            ))
         db.add(m.ConsentTemplate(
             tenant_id=tenant.id, code="VIDEO_REC", name="Video Recording Consent",
             purpose="telemedicine_recording", version="1.0",
@@ -290,6 +299,9 @@ def seed():
 
         db.commit()
         print("Seed complete: superadmin@sumayacare360.com / SuperAdmin@360 | tenant=demo")
+
+        from app.db.demo_data import seed_demo_replay
+        seed_demo_replay(db)
     finally:
         db.close()
 

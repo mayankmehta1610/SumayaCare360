@@ -1284,6 +1284,34 @@ def queue_notification(payload: NotificationOutboxCreate, ctx: AuthContext = Dep
     return {"id": str(row.id), "status": "pending"}
 
 
+@router.get("/notifications/outbox")
+def list_notifications(
+    status: str = "",
+    ctx: AuthContext = Depends(require_tenant),
+    db: Session = Depends(get_db),
+):
+    q = db.query(m.NotificationOutbox).filter(
+        m.NotificationOutbox.tenant_id == ctx.tenant_id,
+        m.NotificationOutbox.is_deleted == False,
+    )
+    if status:
+        q = q.filter(m.NotificationOutbox.status == status)
+    rows = q.order_by(m.NotificationOutbox.created_at.desc()).limit(100).all()
+    return [
+        {
+            "id": str(r.id),
+            "channel": r.channel,
+            "recipient": r.recipient,
+            "subject": r.subject,
+            "body": r.body,
+            "status": r.status,
+            "sent_at": r.sent_at,
+            "created_at": r.created_at,
+        }
+        for r in rows
+    ]
+
+
 # ───────────────────────── Dashboard KPIs ─────────────────────────
 @router.get("/dashboard/summary")
 def dashboard_summary(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
@@ -1292,23 +1320,37 @@ def dashboard_summary(ctx: AuthContext = Depends(require_tenant), db: Session = 
     open_enc = db.query(m.Encounter).filter(m.Encounter.tenant_id == ctx.tenant_id, m.Encounter.status == "open").count()
     tele = db.query(m.TelemedicineSession).filter(m.TelemedicineSession.tenant_id == ctx.tenant_id).count()
     invoices = db.query(m.Invoice).filter(m.Invoice.tenant_id == ctx.tenant_id).count()
-    ipd = db.query(m.IpdAdmission).filter(m.IpdAdmission.tenant_id == ctx.tenant_id).count()
+    ipd = db.query(m.IpdAdmission).filter(m.IpdAdmission.tenant_id == ctx.tenant_id, m.IpdAdmission.status == "admitted").count()
     lab = db.query(m.LabOrder).filter(m.LabOrder.tenant_id == ctx.tenant_id).count()
+    rad = db.query(m.RadiologyOrder).filter(m.RadiologyOrder.tenant_id == ctx.tenant_id).count()
+    rx = db.query(m.PharmacyDispense).filter(m.PharmacyDispense.tenant_id == ctx.tenant_id).count()
     claims = db.query(m.InsuranceClaim).filter(m.InsuranceClaim.tenant_id == ctx.tenant_id).count()
+    triage = db.query(m.TriageAssessment).filter(m.TriageAssessment.tenant_id == ctx.tenant_id).count()
+    ot = db.query(m.OtProcedure).filter(m.OtProcedure.tenant_id == ctx.tenant_id).count()
+    nursing = db.query(m.NursingTask).filter(m.NursingTask.tenant_id == ctx.tenant_id).count()
+    pathways = db.query(m.PathwayEnrollment).filter(m.PathwayEnrollment.tenant_id == ctx.tenant_id).count()
     beds_avail = db.query(m.Bed).filter(m.Bed.tenant_id == ctx.tenant_id, m.Bed.status == "available").count()
     modules_active = db.query(m.PlatformModule).filter(m.PlatformModule.active == True).count()
+    domain_records = db.query(m.ModuleRecord).filter(m.ModuleRecord.tenant_id == ctx.tenant_id).count()
     return {
         "kpis": [
             {"code": "patients", "label": "Patients", "value": patients, "drilldown": "/patients"},
             {"code": "appointments", "label": "Appointments", "value": appts, "drilldown": "/appointments"},
-            {"code": "checked_in", "label": "Checked In", "value": db.query(m.Appointment).filter(m.Appointment.tenant_id == ctx.tenant_id, m.Appointment.status == "checked_in").count(), "drilldown": "/appointments?status=checked_in"},
+            {"code": "checked_in", "label": "Checked In", "value": db.query(m.Appointment).filter(m.Appointment.tenant_id == ctx.tenant_id, m.Appointment.status == "checked_in").count(), "drilldown": "/appointments"},
             {"code": "open_encounters", "label": "Open Encounters", "value": open_enc, "drilldown": "/encounters"},
             {"code": "telemedicine", "label": "Tele Sessions", "value": tele, "drilldown": "/telemedicine"},
-            {"code": "ipd", "label": "IPD Admissions", "value": ipd, "drilldown": "/clinical-hub"},
-            {"code": "lab", "label": "Lab Orders", "value": lab, "drilldown": "/clinical-hub"},
-            {"code": "claims", "label": "Insurance Claims", "value": claims, "drilldown": "/clinical-hub"},
-            {"code": "beds", "label": "Beds Available", "value": beds_avail, "drilldown": "/administration"},
+            {"code": "triage", "label": "ED Triage", "value": triage, "drilldown": "/emergency"},
+            {"code": "ipd", "label": "IPD Active", "value": ipd, "drilldown": "/inpatient"},
+            {"code": "nursing", "label": "Nursing Tasks", "value": nursing, "drilldown": "/nursing"},
+            {"code": "ot", "label": "OT Cases", "value": ot, "drilldown": "/operation-theatre"},
+            {"code": "lab", "label": "Lab Orders", "value": lab, "drilldown": "/laboratory"},
+            {"code": "radiology", "label": "Radiology", "value": rad, "drilldown": "/radiology"},
+            {"code": "pharmacy", "label": "Pharmacy Queue", "value": rx, "drilldown": "/pharmacy"},
+            {"code": "pathways", "label": "Pathway Enrollments", "value": pathways, "drilldown": "/pathways"},
+            {"code": "claims", "label": "Insurance Claims", "value": claims, "drilldown": "/insurance-claims"},
+            {"code": "beds", "label": "Beds Available", "value": beds_avail, "drilldown": "/rooms-facilities"},
             {"code": "invoices", "label": "Invoices", "value": invoices, "drilldown": "/billing"},
-            {"code": "modules", "label": "Platform Modules", "value": modules_active, "drilldown": "/reports"},
+            {"code": "domain_records", "label": "Module Work Items", "value": domain_records, "drilldown": "/module-map"},
+            {"code": "modules", "label": "Platform Modules", "value": modules_active, "drilldown": "/module-map"},
         ]
     }
