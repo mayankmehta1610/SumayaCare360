@@ -16,5 +16,6 @@ htmlcov/
 *.log
 pgdata/
 miniodata/
+*.db
 requirements_dump.md
 _extract/

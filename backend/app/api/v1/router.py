@@ -9,6 +9,7 @@ from app.core.deps import (
     AuthContext, get_current_context, require_permission, require_tenant, permissions_for_role
 )
 from app.services.audit import write_audit
+from app.services.care_journey import encounter_detail, discharge_encounter, patient_chart
 from app.schemas.schemas import *
 from app.models import entities as m
 
@@ -123,6 +124,113 @@ def logout(request: Request, ctx: AuthContext = Depends(get_current_context), db
     return {"message": "Logged out"}
 
 
+@router.post("/auth/forgot-password")
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    import hashlib
+    import secrets
+    from datetime import timedelta
+
+    q = db.query(m.User).filter(m.User.email == payload.email, m.User.is_deleted == False)
+    if payload.tenant_code:
+        tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == payload.tenant_code).first()
+        if tenant:
+            q = q.filter(m.User.tenant_id == tenant.id)
+    user = q.first()
+    if not user:
+        return {"message": "If the account exists, a reset link has been queued"}
+    raw = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw.encode()).hexdigest()
+    from datetime import datetime, timezone
+    row = m.PasswordResetToken(
+        user_id=user.id,
+        token_hash=token_hash,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        created_by=user.id,
+        updated_by=user.id,
+    )
+    db.add(row)
+    if user.tenant_id:
+        outbox = m.NotificationOutbox(
+            tenant_id=user.tenant_id,
+            channel="email",
+            recipient=payload.email,
+            subject="SUMAYA Care 360 — Password reset",
+            body=f"Reset token (dev): {raw}",
+            status="pending",
+            created_by=user.id,
+            updated_by=user.id,
+        )
+        db.add(outbox)
+    db.commit()
+    return {"message": "If the account exists, a reset link has been queued"}
+
+
+@router.post("/auth/reset-password")
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    import hashlib
+    from datetime import datetime, timezone
+
+    token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
+    row = db.query(m.PasswordResetToken).filter(
+        m.PasswordResetToken.token_hash == token_hash,
+        m.PasswordResetToken.used == False,
+        m.PasswordResetToken.expires_at > datetime.now(timezone.utc),
+    ).first()
+    if not row:
+        raise HTTPException(400, "Invalid or expired reset token")
+    user = db.query(m.User).filter(m.User.id == row.user_id).first()
+    if not user:
+        raise HTTPException(400, "User not found")
+    user.hashed_password = hash_password(payload.new_password)
+    row.used = True
+    db.commit()
+    return {"message": "Password updated"}
+
+
+@router.get("/auth/mfa/status")
+def mfa_status(ctx: AuthContext = Depends(get_current_context)):
+    return {"mfa_enabled": bool(ctx.user.mfa_enabled)}
+
+
+@router.post("/auth/mfa/setup", response_model=MfaSetupResponse)
+def mfa_setup(ctx: AuthContext = Depends(get_current_context), db: Session = Depends(get_db)):
+    import secrets
+    secret = secrets.token_hex(16)
+    ctx.user.mfa_secret = secret
+    ctx.user.mfa_enabled = False
+    db.commit()
+    label = ctx.user.email
+    return MfaSetupResponse(
+        secret=secret,
+        otpauth_url=f"otpauth://totp/SUMAYA:{label}?secret={secret}&issuer=SUMAYACare360",
+    )
+
+
+@router.post("/auth/mfa/verify")
+def mfa_verify(payload: MfaVerifyRequest, ctx: AuthContext = Depends(get_current_context), db: Session = Depends(get_db)):
+    if not ctx.user.mfa_secret:
+        raise HTTPException(400, "MFA not initialized — call /auth/mfa/setup first")
+    import hmac
+    import struct
+    import time
+
+    def _totp(secret_hex: str, window: int = 0) -> str:
+        key = bytes.fromhex(secret_hex)
+        counter = int(time.time()) // 30 + window
+        msg = struct.pack(">Q", counter)
+        digest = hmac.new(key, msg, "sha1").digest()
+        offset = digest[-1] & 0x0F
+        code = (struct.unpack(">I", digest[offset : offset + 4])[0] & 0x7FFFFFFF) % 1000000
+        return f"{code:06d}"
+
+    ok = any(hmac.compare_digest(payload.code, _totp(ctx.user.mfa_secret, w)) for w in (0, -1, 1))
+    if not ok:
+        raise HTTPException(401, "Invalid MFA code")
+    ctx.user.mfa_enabled = True
+    db.commit()
+    return {"mfa_enabled": True}
+
+
 # ───────────────────────── Super Admin Tenants ─────────────────────────
 @router.get("/super-admin/tenants")
 def list_tenants(ctx: AuthContext = Depends(require_permission("*")), db: Session = Depends(get_db)):
@@ -194,6 +302,8 @@ def _seed_tenant_defaults(db: Session, tenant_id, user_id):
         ("OPD_CONSULT", "OPD Consultation", "consultation", 500),
         ("TELE_CONSULT", "Telemedicine Consultation", "consultation", 400),
         ("REG_FEE", "Registration Fee", "registration", 100),
+        ("IPD_DAY", "IPD Daily Charge", "inpatient", 2500),
+        ("LAB_CBC", "CBC Lab Test", "lab", 350),
     ]
     for code, name, cat, amt in defaults:
         db.add(m.Tariff(
@@ -530,6 +640,40 @@ def create_appointment(payload: AppointmentCreate, ctx: AuthContext = Depends(re
     return row
 
 
+@router.post("/appointments/{appointment_id}/start-encounter")
+def start_encounter_from_appointment(
+    appointment_id: str,
+    ctx: AuthContext = Depends(require_permission("encounters:*")),
+    db: Session = Depends(get_db),
+):
+    appt = db.query(m.Appointment).filter(
+        m.Appointment.id == appointment_id, m.Appointment.tenant_id == ctx.tenant_id
+    ).first()
+    if not appt:
+        raise HTTPException(404, "Appointment not found")
+    existing = db.query(m.Encounter).filter(
+        m.Encounter.appointment_id == appt.id, m.Encounter.tenant_id == ctx.tenant_id, m.Encounter.is_deleted == False
+    ).first()
+    if existing:
+        return {"id": str(existing.id), "status": existing.status, "message": "Encounter already exists"}
+    enc = m.Encounter(
+        tenant_id=ctx.tenant_id, branch_id=appt.branch_id,
+        patient_id=appt.patient_id, provider_id=appt.provider_id,
+        appointment_id=appt.id, encounter_type="opd",
+        chief_complaint=appt.reason or "Follow-up",
+        created_by=ctx.user.id, updated_by=ctx.user.id,
+    )
+    db.add(enc)
+    appt.status = "in_progress"
+    appt.updated_by = ctx.user.id
+    write_audit(db, tenant_id=ctx.tenant_id, actor_user_id=ctx.user.id, action="CREATE",
+                entity_type="encounter", entity_id=None,
+                new_values={"appointment_id": str(appt.id)}, correlation_id=ctx.correlation_id)
+    db.commit()
+    db.refresh(enc)
+    return {"id": str(enc.id), "status": enc.status, "appointment_id": str(appt.id)}
+
+
 @router.patch("/appointments/{appointment_id}/status")
 def update_appointment_status(appointment_id: str, status: str = Query(...), ctx: AuthContext = Depends(require_permission("appointments:*")), db: Session = Depends(get_db)):
     row = db.query(m.Appointment).filter(
@@ -619,6 +763,11 @@ def list_encounters(ctx: AuthContext = Depends(require_permission("encounters:re
     ]
 
 
+@router.get("/encounters/{encounter_id}")
+def get_encounter(encounter_id: str, ctx: AuthContext = Depends(require_permission("encounters:read")), db: Session = Depends(get_db)):
+    return encounter_detail(db, ctx.tenant_id, encounter_id)
+
+
 @router.post("/encounters/{encounter_id}/vitals")
 def add_vitals(encounter_id: str, payload: VitalCreate, ctx: AuthContext = Depends(require_permission("vitals:*")), db: Session = Depends(get_db)):
     enc = db.query(m.Encounter).filter(m.Encounter.id == encounter_id, m.Encounter.tenant_id == ctx.tenant_id).first()
@@ -698,18 +847,44 @@ def create_prescription(encounter_id: str, payload: PrescriptionCreate, ctx: Aut
     return {"id": str(rx.id), "status": rx.status}
 
 
-@router.patch("/encounters/{encounter_id}/close")
-def close_encounter(encounter_id: str, assessment: str = "", plan: str = "", ctx: AuthContext = Depends(require_permission("encounters:*")), db: Session = Depends(get_db)):
-    enc = db.query(m.Encounter).filter(m.Encounter.id == encounter_id, m.Encounter.tenant_id == ctx.tenant_id).first()
-    if not enc:
-        raise HTTPException(404, "Encounter not found")
-    enc.status = "closed"
-    enc.assessment = assessment or enc.assessment
-    enc.plan = plan or enc.plan
-    enc.closed_at = datetime.now(timezone.utc)
-    enc.updated_by = ctx.user.id
+@router.post("/encounters/{encounter_id}/discharge")
+def discharge_opd(
+    encounter_id: str,
+    payload: DischargeCreate,
+    ctx: AuthContext = Depends(require_permission("encounters:*")),
+    db: Session = Depends(get_db),
+):
+    result = discharge_encounter(
+        db, tenant_id=ctx.tenant_id, tenant_code=ctx.tenant_code or "TENANT",
+        encounter_id=encounter_id, actor_id=ctx.user.id,
+        assessment=payload.assessment, plan=payload.plan,
+        correlation_id=ctx.correlation_id,
+    )
     db.commit()
-    return {"id": str(enc.id), "status": enc.status}
+    return result
+
+
+@router.patch("/encounters/{encounter_id}/close")
+def close_encounter(
+    encounter_id: str,
+    assessment: str = "",
+    plan: str = "",
+    ctx: AuthContext = Depends(require_permission("encounters:*")),
+    db: Session = Depends(get_db),
+):
+    result = discharge_encounter(
+        db, tenant_id=ctx.tenant_id, tenant_code=ctx.tenant_code or "TENANT",
+        encounter_id=encounter_id, actor_id=ctx.user.id,
+        assessment=assessment, plan=plan,
+        correlation_id=ctx.correlation_id,
+    )
+    db.commit()
+    return result
+
+
+@router.get("/patients/{patient_id}/chart")
+def get_patient_chart(patient_id: str, ctx: AuthContext = Depends(require_permission("patients:read")), db: Session = Depends(get_db)):
+    return patient_chart(db, ctx.tenant_id, patient_id)
 
 
 # ───────────────────────── Telemedicine ─────────────────────────
@@ -1004,6 +1179,7 @@ def list_invoices(ctx: AuthContext = Depends(require_permission("billing:read"))
     rows = db.query(m.Invoice).filter(m.Invoice.tenant_id == ctx.tenant_id, m.Invoice.is_deleted == False).all()
     return [
         {"id": str(r.id), "invoice_no": r.invoice_no, "patient_id": str(r.patient_id),
+         "encounter_id": str(r.encounter_id) if r.encounter_id else None,
          "status": r.status, "total": float(r.total or 0), "currency": r.currency}
         for r in rows
     ]

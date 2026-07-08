@@ -123,3 +123,69 @@ def update_record_status(
         old_values={"status": old}, new_values={"status": status},
         correlation_id=correlation_id,
     )
+
+
+def get_record(db: Session, tenant_id: UUID, module_code: str, record_id: UUID) -> Optional[m.ModuleRecord]:
+    return db.query(m.ModuleRecord).filter(
+        m.ModuleRecord.id == record_id,
+        m.ModuleRecord.tenant_id == tenant_id,
+        m.ModuleRecord.module_code == module_code,
+        m.ModuleRecord.is_deleted == False,
+    ).first()
+
+
+def update_record(
+    db: Session,
+    row: m.ModuleRecord,
+    *,
+    title: Optional[str],
+    status: Optional[str],
+    payload: Optional[dict[str, Any]],
+    actor_id: UUID,
+    correlation_id: Optional[str] = None,
+) -> m.ModuleRecord:
+    old = {"title": row.title, "status": row.status}
+    if title is not None:
+        row.title = title
+    if status is not None:
+        row.status = status
+    if payload is not None:
+        row.payload = {**(row.payload or {}), **payload}
+    row.updated_by = actor_id
+    write_audit(
+        db, tenant_id=row.tenant_id, actor_user_id=actor_id, action="UPDATE",
+        entity_type=row.module_code, entity_id=str(row.id),
+        old_values=old, new_values={"title": row.title, "status": row.status},
+        correlation_id=correlation_id,
+    )
+    return row
+
+
+def soft_delete_record(
+    db: Session, row: m.ModuleRecord, actor_id: UUID, correlation_id: Optional[str] = None
+):
+    row.is_deleted = True
+    row.updated_by = actor_id
+    write_audit(
+        db, tenant_id=row.tenant_id, actor_user_id=actor_id, action="DELETE",
+        entity_type=row.module_code, entity_id=str(row.id),
+        correlation_id=correlation_id,
+    )
+
+
+def export_records(rows: list[m.ModuleRecord]) -> dict:
+    return {
+        "format": "json",
+        "count": len(rows),
+        "records": [
+            {
+                "id": str(r.id),
+                "reference_no": r.reference_no,
+                "submodule": r.submodule,
+                "title": r.title,
+                "status": r.status,
+                "payload": r.payload,
+            }
+            for r in rows
+        ],
+    }

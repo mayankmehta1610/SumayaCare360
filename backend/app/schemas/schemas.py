@@ -23,6 +23,25 @@ class RefreshRequest(BaseModel):
     access_token: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+    tenant_code: Optional[str] = None
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)
+
+
+class MfaSetupResponse(BaseModel):
+    secret: str
+    otpauth_url: str
+
+
+class MfaVerifyRequest(BaseModel):
+    code: str
+
+
 class DepartmentCreate(BaseModel):
     code: str
     name: str
@@ -239,6 +258,11 @@ class DiagnosisCreate(BaseModel):
 class PrescriptionCreate(BaseModel):
     notes: Optional[str] = None
     lines: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class DischargeCreate(BaseModel):
+    assessment: str = ""
+    plan: str = ""
 
 
 class TeleSessionCreate(BaseModel):

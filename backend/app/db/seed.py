@@ -135,6 +135,8 @@ def seed():
             ("OPD_CONSULT", "OPD Consultation", "consultation", 500),
             ("TELE_CONSULT", "Telemedicine Consultation", "consultation", 400),
             ("REG_FEE", "Registration Fee", "registration", 100),
+            ("IPD_DAY", "IPD Daily Charge", "inpatient", 2500),
+            ("LAB_CBC", "CBC Lab Test", "lab", 350),
         ]:
             db.add(m.Tariff(tenant_id=tenant.id, code=code, name=name, category=cat, amount=amt,
                             created_by=super_admin.id, updated_by=super_admin.id))

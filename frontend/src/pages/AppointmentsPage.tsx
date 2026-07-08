@@ -55,6 +55,16 @@ export default function AppointmentsPage() {
     }
   }
 
+  async function startEncounter(apptId: string) {
+    try {
+      const res = await api<{ id: string }>(`/appointments/${apptId}/start-encounter`, { method: "POST" });
+      setMsg(`Encounter started — open Encounters or Care Journey (${res.id.slice(0, 8)})`);
+      await load();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
   async function setStatus(id: string, status: string) {
     try {
       await api(`/appointments/${id}/status?status=${status}`, { method: "PATCH" });
@@ -118,7 +128,7 @@ export default function AppointmentsPage() {
                   <td><span className="badge">{r.status}</span></td>
                   <td className="actions">
                     <button type="button" className="secondary" onClick={() => setStatus(r.id, "checked_in")}>Check in</button>
-                    <button type="button" className="secondary" onClick={() => setStatus(r.id, "completed")}>Complete</button>
+                    <button type="button" onClick={() => startEncounter(r.id)}>Start encounter</button>
                     <button type="button" className="secondary" onClick={() => setStatus(r.id, "cancelled")}>Cancel</button>
                     <button type="button" className="secondary" onClick={() => setStatus(r.id, "no_show")}>No show</button>
                   </td>

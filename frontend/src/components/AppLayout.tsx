@@ -7,12 +7,16 @@ type Mod = { code: string; name: string; category: string; route: string; is_ded
 
 const STATIC_LINKS = [
   { to: "/dashboard", label: "Dashboard", category: "Overview" },
+  { to: "/care-journey", label: "Care Journey (E2E)", category: "Clinical" },
+  { to: "/portal", label: "Patient portal", category: "Engagement" },
   { to: "/administration", label: "Administration", category: "Administration" },
   { to: "/clinical-hub", label: "Lab / IPD / Claims", category: "Clinical" },
   { to: "/masters", label: "Configuration Masters", category: "Platform" },
   { to: "/reports", label: "Reports & BI", category: "Analytics" },
   { to: "/notifications", label: "Notifications", category: "Engagement" },
+  { to: "/engineering", label: "Engineering APIs", category: "Platform" },
   { to: "/audit", label: "Audit & Governance", category: "Platform" },
+  { to: "/settings/mfa", label: "MFA settings", category: "Platform" },
   { to: "/tenants", label: "Tenants (Super)", category: "Platform", superOnly: true },
 ];
 
@@ -26,19 +30,21 @@ export default function AppLayout() {
   }, []);
 
   const nav = useMemo(() => {
+    const prefix = session?.tenant_code ? `/${session.tenant_code}` : "";
+    const withPrefix = (to: string) => (to.startsWith("/") ? `${prefix}${to}` : to);
     const dedicated = modules.filter((m) => m.is_dedicated).map((m) => ({
-      to: m.route,
+      to: withPrefix(m.route),
       label: m.name,
       category: m.category,
     }));
     const generic = modules
       .filter((m) => !m.is_dedicated)
       .map((m) => ({
-        to: m.route.startsWith("/modules/") ? m.route : `/modules/${m.code}`,
+        to: withPrefix(m.route.startsWith("/modules/") ? m.route : `/modules/${m.code}`),
         label: m.name,
         category: m.category,
       }));
-    const all = [...STATIC_LINKS, ...dedicated, ...generic];
+    const all = [...STATIC_LINKS.map((s) => ({ ...s, to: withPrefix(s.to) })), ...dedicated, ...generic];
     const byCat: Record<string, typeof all> = {};
     for (const item of all) {
       if ((item as any).superOnly && session?.role_code !== "SUPER_ADMIN") continue;

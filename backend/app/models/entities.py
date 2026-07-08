@@ -76,6 +76,8 @@ class User(Base, AuditedMixin):
     phone = Column(String(32))
     status = Column(String(32), default="active")
     is_super_admin = Column(Boolean, default=False)
+    mfa_enabled = Column(Boolean, default=False, nullable=False)
+    mfa_secret = Column(String(128), nullable=True)
     __table_args__ = (UniqueConstraint("tenant_id", "email", name="uq_user_tenant_email"),)
 
 
@@ -619,4 +621,41 @@ class KpiDefinition(Base, AuditedMixin):
     module_code = Column(String(128))
     drilldown_route = Column(String(255))
     query_hint = Column(String(255))
+    status = Column(String(32), default="active")
+
+
+class ExpandedResource(Base, AuditedMixin):
+    __tablename__ = "expanded_resources"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
+    area_code = Column(String(128), nullable=False, index=True)
+    resource_code = Column(String(128), nullable=False, index=True)
+    reference_no = Column(String(64), nullable=False)
+    title = Column(String(255), nullable=False)
+    status = Column(String(32), default="draft")
+    payload = Column(JSON, default=dict)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "area_code", "resource_code", "reference_no", name="uq_expanded_ref"),
+        Index("ix_expanded_search", "tenant_id", "area_code", "resource_code", "status"),
+    )
+
+
+class PasswordResetToken(Base, AuditedMixin):
+    __tablename__ = "password_reset_tokens"
+    user_id = Column(GUID(), ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(128), nullable=False, unique=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used = Column(Boolean, default=False, nullable=False)
+
+
+class DocumentMetadata(Base, AuditedMixin):
+    __tablename__ = "document_metadata"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
+    entity_type = Column(String(128), nullable=False)
+    entity_id = Column(GUID(), nullable=True)
+    file_name = Column(String(255), nullable=False)
+    content_type = Column(String(128))
+    storage_key = Column(String(512), nullable=False)
+    size_bytes = Column(Integer, default=0)
     status = Column(String(32), default="active")

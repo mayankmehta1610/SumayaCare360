@@ -1,13 +1,14 @@
 import { FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { tenantCode: urlTenant } = useParams();
   const [email, setEmail] = useState("admin@demo.sumaya");
   const [password, setPassword] = useState("TenantAdmin@360");
-  const [tenant, setTenant] = useState("demo");
+  const [tenant, setTenant] = useState(urlTenant || "demo");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -17,7 +18,8 @@ export default function LoginPage() {
     setError("");
     try {
       await login(email, password, tenant || undefined);
-      navigate("/dashboard");
+      const prefix = tenant ? `/${tenant}` : "";
+      navigate(`${prefix}/dashboard`);
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {
@@ -46,6 +48,9 @@ export default function LoginPage() {
         <button disabled={loading} style={{ width: "100%" }}>
           {loading ? "Signing in..." : "Sign in"}
         </button>
+        <p style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
+          <Link to={tenant ? `/${tenant}/forgot-password` : "/forgot-password"}>Forgot password?</Link>
+        </p>
         <p className="muted" style={{ marginTop: "1rem", fontSize: "0.8rem" }}>
           Demo: admin@demo.sumaya / TenantAdmin@360 · tenant <strong>demo</strong>
           <br />

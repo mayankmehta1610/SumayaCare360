@@ -67,8 +67,8 @@ export default function BillingPage() {
 
   return (
     <div>
-      <h1 className="page-title">Billing stubs</h1>
-      <p className="muted">Tariffs from PostgreSQL. Payments accept gateway tokens only (PCI).</p>
+      <h1 className="page-title">Billing</h1>
+      <p className="muted">Invoices auto-created on OPD/IPD discharge. Manual invoices also supported. Payments use gateway tokens only (PCI).</p>
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
       <div className="grid-2">
@@ -106,6 +106,7 @@ export default function BillingPage() {
             <thead>
               <tr>
                 <th>Invoice</th>
+                <th>Encounter</th>
                 <th>Total</th>
                 <th>Status</th>
                 <th></th>
@@ -115,6 +116,7 @@ export default function BillingPage() {
               {invoices.map((i) => (
                 <tr key={i.id}>
                   <td>{i.invoice_no}</td>
+                  <td>{i.encounter_id ? i.encounter_id.slice(0, 8) : "IPD / manual"}</td>
                   <td>
                     {i.currency} {i.total}
                   </td>

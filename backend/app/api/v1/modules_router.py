@@ -8,11 +8,14 @@ from app.db.session import get_db
 from app.core.deps import AuthContext, require_tenant
 from app.models import entities as m
 from app.services import modules as mod_svc
+from app.services.care_journey import discharge_ipd
 from app.data.module_catalog import MODULE_CATALOG
+from app.data.slug_aliases import normalize_slug, SLUG_ALIASES
 
 router = APIRouter(tags=["modules"])
 
-MODULE_CODES = {x["code"] for x in MODULE_CATALOG if not x.get("dedicated")}
+_CANONICAL_MODULES = {x["code"] for x in MODULE_CATALOG if not x.get("dedicated")}
+MODULE_CODES = set(_CANONICAL_MODULES) | set(SLUG_ALIASES.keys())
 RESERVED = {
     "health", "auth", "super-admin", "admin", "masters", "patients", "providers",
     "appointments", "encounters", "telemedicine", "location", "billing", "audit",
@@ -28,6 +31,12 @@ class ModuleRecordCreate(BaseModel):
     branch_id: Optional[UUID] = None
     patient_id: Optional[UUID] = None
     provider_id: Optional[UUID] = None
+
+
+class ModuleRecordUpdate(BaseModel):
+    title: Optional[str] = None
+    status: Optional[str] = None
+    payload: Optional[dict[str, Any]] = None
 
 
 def _serialize_record(r: m.ModuleRecord) -> dict:
@@ -47,8 +56,10 @@ def _serialize_record(r: m.ModuleRecord) -> dict:
 
 
 def _validate_module(module_code: str):
-    if module_code not in MODULE_CODES:
+    canonical = normalize_slug(module_code)
+    if canonical not in _CANONICAL_MODULES:
         raise HTTPException(404, f"Unknown module: {module_code}")
+    return canonical
 
 
 @router.get("/platform/modules")
@@ -103,9 +114,23 @@ def list_module_records(
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
-    _validate_module(module_code)
+    module_code = _validate_module(module_code)
     rows = mod_svc.list_records(db, ctx.tenant_id, module_code, query, status, submodule)
     return [_serialize_record(r) for r in rows]
+
+
+@router.get("/modules/{module_code}/{record_id}")
+def get_module_record(
+    module_code: str,
+    record_id: UUID,
+    ctx: AuthContext = Depends(require_tenant),
+    db: Session = Depends(get_db),
+):
+    module_code = _validate_module(module_code)
+    row = mod_svc.get_record(db, ctx.tenant_id, module_code, record_id)
+    if not row:
+        raise HTTPException(404, "Record not found")
+    return _serialize_record(row)
 
 
 @router.post("/modules/{module_code}")
@@ -115,7 +140,10 @@ def create_module_record(
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
-    _validate_module(module_code)
+    module_code = _validate_module(module_code)
+    if payload.payload.get("action") == "export":
+        rows = mod_svc.list_records(db, ctx.tenant_id, module_code)
+        return mod_svc.export_records(rows)
     mod = db.query(m.PlatformModule).filter(m.PlatformModule.code == module_code).first()
     if mod and payload.submodule not in (mod.submodules or []):
         raise HTTPException(400, f"Invalid submodule. Choose from: {mod.submodules}")
@@ -139,7 +167,7 @@ def update_module_status(
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
-    _validate_module(module_code)
+    module_code = _validate_module(module_code)
     row = db.query(m.ModuleRecord).filter(
         m.ModuleRecord.id == record_id,
         m.ModuleRecord.tenant_id == ctx.tenant_id,
@@ -152,11 +180,91 @@ def update_module_status(
     return _serialize_record(row)
 
 
+@router.patch("/modules/{module_code}/{record_id}")
+def patch_module_record(
+    module_code: str,
+    record_id: UUID,
+    payload: ModuleRecordUpdate,
+    ctx: AuthContext = Depends(require_tenant),
+    db: Session = Depends(get_db),
+):
+    module_code = _validate_module(module_code)
+    row = mod_svc.get_record(db, ctx.tenant_id, module_code, record_id)
+    if not row:
+        raise HTTPException(404, "Record not found")
+    mod_svc.update_record(
+        db, row, title=payload.title, status=payload.status, payload=payload.payload,
+        actor_id=ctx.user.id, correlation_id=ctx.correlation_id,
+    )
+    db.commit()
+    return _serialize_record(row)
+
+
+@router.delete("/modules/{module_code}/{record_id}")
+def delete_module_record(
+    module_code: str,
+    record_id: UUID,
+    ctx: AuthContext = Depends(require_tenant),
+    db: Session = Depends(get_db),
+):
+    module_code = _validate_module(module_code)
+    row = mod_svc.get_record(db, ctx.tenant_id, module_code, record_id)
+    if not row:
+        raise HTTPException(404, "Record not found")
+    mod_svc.soft_delete_record(db, row, ctx.user.id, ctx.correlation_id)
+    db.commit()
+    return {"deleted": True, "id": str(record_id)}
+
+
+@router.post("/modules/{module_code}/{record_id}/approve")
+def approve_module_record(
+    module_code: str,
+    record_id: UUID,
+    ctx: AuthContext = Depends(require_tenant),
+    db: Session = Depends(get_db),
+):
+    module_code = _validate_module(module_code)
+    row = mod_svc.get_record(db, ctx.tenant_id, module_code, record_id)
+    if not row:
+        raise HTTPException(404, "Record not found")
+    mod_svc.update_record_status(db, row, "approved", ctx.user.id, ctx.correlation_id)
+    db.commit()
+    return _serialize_record(row)
+
+
+@router.post("/modules/{module_code}/{record_id}/reject")
+def reject_module_record(
+    module_code: str,
+    record_id: UUID,
+    ctx: AuthContext = Depends(require_tenant),
+    db: Session = Depends(get_db),
+):
+    module_code = _validate_module(module_code)
+    row = mod_svc.get_record(db, ctx.tenant_id, module_code, record_id)
+    if not row:
+        raise HTTPException(404, "Record not found")
+    mod_svc.update_record_status(db, row, "rejected", ctx.user.id, ctx.correlation_id)
+    db.commit()
+    return _serialize_record(row)
+
+
+@router.post("/modules/{module_code}/export")
+def export_module_records(
+    module_code: str,
+    ctx: AuthContext = Depends(require_tenant),
+    db: Session = Depends(get_db),
+):
+    module_code = _validate_module(module_code)
+    rows = mod_svc.list_records(db, ctx.tenant_id, module_code)
+    return mod_svc.export_records(rows)
+
+
 @router.get("/{module_code}")
 def api_backlog_list(module_code: str, query: str = "", ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
     if module_code in RESERVED or module_code not in MODULE_CODES:
         raise HTTPException(404, "Not found")
-    rows = mod_svc.list_records(db, ctx.tenant_id, module_code, query)
+    canonical = normalize_slug(module_code)
+    rows = mod_svc.list_records(db, ctx.tenant_id, canonical, query)
     return [_serialize_record(r) for r in rows]
 
 
@@ -164,8 +272,9 @@ def api_backlog_list(module_code: str, query: str = "", ctx: AuthContext = Depen
 def api_backlog_create(module_code: str, payload: ModuleRecordCreate, ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
     if module_code in RESERVED or module_code not in MODULE_CODES:
         raise HTTPException(404, "Not found")
+    canonical = normalize_slug(module_code)
     row = mod_svc.create_record(
-        db, tenant_id=ctx.tenant_id, module_code=module_code,
+        db, tenant_id=ctx.tenant_id, module_code=canonical,
         submodule=payload.submodule, title=payload.title, status=payload.status,
         payload=payload.payload, actor_id=ctx.user.id,
         correlation_id=ctx.correlation_id,
@@ -234,6 +343,21 @@ def admit_ipd(
     db.add(row)
     db.commit()
     return {"id": str(row.id), "admission_no": row.admission_no}
+
+
+@router.post("/clinical/ipd-admissions/{admission_id}/discharge")
+def discharge_ipd_admission(
+    admission_id: UUID,
+    ctx: AuthContext = Depends(require_tenant),
+    db: Session = Depends(get_db),
+):
+    tenant = db.query(m.Tenant).filter(m.Tenant.id == ctx.tenant_id).first()
+    result = discharge_ipd(
+        db, tenant_id=ctx.tenant_id, tenant_code=tenant.tenant_code if tenant else "TENANT",
+        admission_id=admission_id, actor_id=ctx.user.id, correlation_id=ctx.correlation_id,
+    )
+    db.commit()
+    return result
 
 
 @router.get("/clinical/insurance-claims")

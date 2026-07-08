@@ -1,12 +1,23 @@
 """Upgrade seed data for existing databases."""
+import sqlalchemy as sa
 from app.db.session import SessionLocal, engine, Base
 from app.models import entities as m
 from app.services.modules import sync_platform_modules
 import app.models.entities  # noqa
 
 
+def _sqlite_add_column_if_missing(conn, table: str, column: str, col_type: str):
+    rows = conn.execute(sa.text(f"PRAGMA table_info({table})")).fetchall()
+    if not any(r[1] == column for r in rows):
+        conn.execute(sa.text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+
+
 def upgrade():
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        if engine.dialect.name == "sqlite":
+            _sqlite_add_column_if_missing(conn, "users", "mfa_enabled", "BOOLEAN DEFAULT 0")
+            _sqlite_add_column_if_missing(conn, "users", "mfa_secret", "VARCHAR(255)")
     db = SessionLocal()
     try:
         sync_platform_modules(db, None)
@@ -26,6 +37,13 @@ def upgrade():
         if db.query(m.InsurancePayer).filter(m.InsurancePayer.tenant_id == tenant.id).count() == 0:
             for code, name in [("STAR", "Star Health"), ("ICICI", "ICICI Lombard")]:
                 db.add(m.InsurancePayer(tenant_id=tenant.id, code=code, name=name, created_by=aid, updated_by=aid))
+        for code, name, cat, amt in [
+            ("IPD_DAY", "IPD Daily Charge", "inpatient", 2500),
+            ("LAB_CBC", "CBC Lab Test", "lab", 350),
+        ]:
+            if not db.query(m.Tariff).filter(m.Tariff.tenant_id == tenant.id, m.Tariff.code == code).first():
+                db.add(m.Tariff(tenant_id=tenant.id, code=code, name=name, category=cat, amount=amt,
+                                created_by=aid, updated_by=aid))
         if db.query(m.ReportDefinition).count() == 0 and aid:
             db.add(m.ReportDefinition(tenant_id=tenant.id, code="opd-dashboard", name="OPD Dashboard",
                                       audience="Operations", module_code="appointment-and-queue-management",

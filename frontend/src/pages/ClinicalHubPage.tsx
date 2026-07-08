@@ -54,6 +54,12 @@ export default function ClinicalHubPage() {
     await load();
   }
 
+  async function dischargeIpd(id: string) {
+    const res = await api<{ invoice: { invoice_no: string; total: number } }>(`/clinical/ipd-admissions/${id}/discharge`, { method: "POST" });
+    setMsg(`Discharged — invoice ${res.invoice.invoice_no} (₹${res.invoice.total}). Bed released.`);
+    await load();
+  }
+
   async function submitClaim(e: FormEvent) {
     e.preventDefault();
     const q = new URLSearchParams({
@@ -137,8 +143,21 @@ export default function ClinicalHubPage() {
         </div>
         <div className="card table-wrap">
           <h3 style={{ marginTop: 0 }}>IPD admissions</h3>
-          <table><thead><tr><th>Admission</th><th>Bed</th><th>Status</th></tr></thead>
-            <tbody>{ipd.map((r) => <tr key={r.id}><td>{r.admission_no}</td><td>{r.bed_code}</td><td>{r.status}</td></tr>)}</tbody></table>
+          <table><thead><tr><th>Admission</th><th>Bed</th><th>Status</th><th></th></tr></thead>
+            <tbody>{ipd.map((r) => (
+              <tr key={r.id}>
+                <td>{r.admission_no}</td>
+                <td>{r.bed_code}</td>
+                <td>{r.status}</td>
+                <td>
+                  {r.status !== "discharged" && (
+                    <button type="button" className="secondary" onClick={() => dischargeIpd(r.id).catch((e) => setError(e.message))}>
+                      Discharge & bill
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}</tbody></table>
         </div>
         <div className="card table-wrap">
           <h3 style={{ marginTop: 0 }}>Insurance claims</h3>

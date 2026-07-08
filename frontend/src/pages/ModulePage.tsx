@@ -128,8 +128,11 @@ export default function ModulePage() {
                     {r.status !== "completed" && (
                       <button type="button" className="secondary" onClick={() => setStatus(r.id, "in_progress").catch((e) => setError(e.message))}>Start</button>
                     )}
-                    {r.status !== "completed" && (
-                      <button type="button" className="secondary" onClick={() => setStatus(r.id, "completed").catch((e) => setError(e.message))}>Complete</button>
+                    {r.status !== "approved" && (
+                      <button type="button" className="secondary" onClick={() => api(`/modules/${moduleCode}/${r.id}/approve`, { method: "POST" }).then(() => load()).catch((e) => setError(e.message))}>Approve</button>
+                    )}
+                    {r.status !== "rejected" && (
+                      <button type="button" className="secondary" onClick={() => api(`/modules/${moduleCode}/${r.id}/reject`, { method: "POST" }).then(() => load()).catch((e) => setError(e.message))}>Reject</button>
                     )}
                   </td>
                 </tr>
