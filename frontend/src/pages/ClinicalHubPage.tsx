@@ -1,7 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { useAuth } from "../context/AuthContext";
+import ModuleFlowBar from "../components/ModuleFlowBar";
 
 export default function ClinicalHubPage() {
+  const { session } = useAuth();
+  const prefix = session?.tenant_code ? `/${session.tenant_code}` : "";
   const [patients, setPatients] = useState<any[]>([]);
   const [tests, setTests] = useState<any[]>([]);
   const [beds, setBeds] = useState<any[]>([]);
@@ -75,8 +80,17 @@ export default function ClinicalHubPage() {
 
   return (
     <div>
+      <ModuleFlowBar moduleCode="laboratory-and-diagnostics" compact />
       <h1 className="page-title">Clinical operations hub</h1>
-      <p className="muted">Laboratory · IPD · Insurance claims — masters from PostgreSQL</p>
+      <p className="muted">Laboratory · IPD · Insurance — linked to encounters, billing & care programs</p>
+      <div className="actions" style={{ marginBottom: "1rem" }}>
+        <Link to={`${prefix}/modules/laboratory-and-diagnostics`} className="secondary button-link">Lab module</Link>
+        <Link to={`${prefix}/modules/radiology-and-imaging`} className="secondary button-link">Radiology</Link>
+        <Link to={`${prefix}/modules/pharmacy-management`} className="secondary button-link">Pharmacy</Link>
+        <Link to={`${prefix}/modules/ipd-admission-and-ward-management`} className="secondary button-link">IPD module</Link>
+        <Link to={`${prefix}/modules/insurance-and-claims`} className="secondary button-link">Insurance module</Link>
+        <Link to={`${prefix}/hubs/finance`} className="secondary button-link">Finance hub →</Link>
+      </div>
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
       <div className="grid-2">

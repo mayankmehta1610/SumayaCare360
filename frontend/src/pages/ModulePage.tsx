@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
+import ModuleFlowBar from "../components/ModuleFlowBar";
 
 type PlatformModule = {
   code: string;
@@ -67,6 +68,7 @@ export default function ModulePage() {
 
   return (
     <div>
+      <ModuleFlowBar moduleCode={moduleCode} />
       <h1 className="page-title">{mod.name}</h1>
       <p className="muted">Database-driven workflow records · tenant scoped · audited</p>
       {error && <div className="error">{error}</div>}

@@ -23,6 +23,8 @@ import PatientPortalPage from "./pages/PatientPortalPage";
 import MfaSettingsPage from "./pages/MfaSettingsPage";
 import EngineeringHubPage from "./pages/EngineeringHubPage";
 import ExpandedAreaPage from "./pages/ExpandedAreaPage";
+import PhaseHubPage from "./pages/PhaseHubPage";
+import ModuleMapPage from "./pages/ModuleMapPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
@@ -75,6 +77,8 @@ const childRoutes = (
     <Route path="settings/mfa" element={<MfaSettingsPage />} />
     <Route path="engineering" element={<EngineeringHubPage />} />
     <Route path="engineering/:areaCode" element={<ExpandedAreaPage />} />
+    <Route path="module-map" element={<ModuleMapPage />} />
+    <Route path="hubs/:phaseId" element={<PhaseHubPage />} />
     <Route path="modules/:moduleCode" element={<ModulePage />} />
     <Route
       path="tenants"

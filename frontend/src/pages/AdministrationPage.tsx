@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import ModuleFlowBar from "../components/ModuleFlowBar";
 
 export default function AdministrationPage() {
   const [branches, setBranches] = useState<any[]>([]);
@@ -26,7 +28,15 @@ export default function AdministrationPage() {
 
   return (
     <div>
+      <ModuleFlowBar moduleCode="hospital-clinic-administration" compact />
       <h1 className="page-title">Hospital / Clinic Administration</h1>
+      <div className="actions" style={{ marginBottom: "1rem" }}>
+        <Link to="/modules/hospital-clinic-administration" className="secondary button-link">Admin workflows</Link>
+        <Link to="/modules/rooms-and-facilities" className="secondary button-link">Rooms & facilities</Link>
+        <Link to="/modules/identity-rbac-and-security" className="secondary button-link">Users & RBAC</Link>
+        <Link to="/masters" className="secondary button-link">Masters</Link>
+        <Link to="/hubs/platform" className="secondary button-link">Platform hub</Link>
+      </div>
       {error && <div className="error">{error}</div>}
       <div className="kpi-grid">
         <div className="kpi"><div className="value">{branches.length}</div><div className="label">Branches</div></div>

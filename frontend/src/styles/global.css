@@ -230,3 +230,98 @@ th {
   text-align: center;
   padding: 1.5rem;
 }
+
+/* Module flow navigation */
+.flow-bar {
+  background: var(--brand-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+.flow-bar-phase { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem; }
+.flow-bar-phase a { color: var(--brand-dark); }
+.flow-bar-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.85rem; }
+.flow-link-prev, .flow-link-next {
+  padding: 0.25rem 0.6rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+.flow-bar-links { margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.flow-quick-link {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.5rem;
+  background: white;
+  border-radius: 6px;
+}
+.button-link {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: var(--brand);
+  color: white !important;
+  border-radius: 10px;
+  font-weight: 600;
+  text-decoration: none;
+}
+a.secondary.button-link {
+  background: white;
+  color: var(--text) !important;
+  border: 1px solid var(--line);
+}
+.flow-phase-nav { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.flow-module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.flow-module-card { position: relative; padding-top: 2rem; }
+.flow-step-num {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--brand);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.flow-quick-links { margin-top: 0.5rem; font-size: 0.8rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.flow-next-hint { margin-top: 0.75rem; font-size: 0.8rem; padding-top: 0.5rem; border-top: 1px dashed var(--line); }
+.flow-phase-section { margin-bottom: 2rem; }
+.flow-phase-header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.flow-phase-header h2 { font-family: var(--display); font-size: 1.15rem; margin: 0; }
+.flow-timeline { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+.flow-timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem 0.35rem 0.35rem;
+  font-size: 0.85rem;
+}
+.flow-timeline-dot {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--brand);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.flow-timeline-sub { font-size: 0.75rem; margin-left: 0.25rem; }
+.flow-phase-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.85rem;
+}
+.flow-phase-card { cursor: pointer; transition: transform 0.15s; }
+.flow-phase-card:hover { transform: translateY(-2px); }

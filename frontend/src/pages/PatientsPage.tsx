@@ -1,5 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { useAuth } from "../context/AuthContext";
+import ModuleFlowBar from "../components/ModuleFlowBar";
 
 type Patient = {
   id: string;
@@ -11,8 +14,20 @@ type Patient = {
   status: string;
 };
 
+type Chart = {
+  appointments: unknown[];
+  encounters: unknown[];
+  invoices: unknown[];
+  lab_orders: unknown[];
+  journey_links: Record<string, string>;
+};
+
 export default function PatientsPage() {
+  const { session } = useAuth();
+  const prefix = session?.tenant_code ? `/${session.tenant_code}` : "";
   const [rows, setRows] = useState<Patient[]>([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [chart, setChart] = useState<Chart | null>(null);
   const [query, setQuery] = useState("");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -37,15 +52,26 @@ export default function PatientsPage() {
       .catch(() => setGenders([]));
   }, []);
 
+  useEffect(() => {
+    if (!selectedId) {
+      setChart(null);
+      return;
+    }
+    api<Chart>(`/patients/${selectedId}/chart`)
+      .then(setChart)
+      .catch(() => setChart(null));
+  }, [selectedId]);
+
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     setError("");
     setMsg("");
     try {
-      await api("/patients", { method: "POST", body: JSON.stringify(form) });
-      setMsg("Patient registered");
+      const created = await api<Patient>("/patients", { method: "POST", body: JSON.stringify(form) });
+      setMsg("Patient registered — continue to care journey");
       setForm({ first_name: "", last_name: "", phone: "", gender_code: "", date_of_birth: "" });
       await load();
+      setSelectedId(created.id);
     } catch (err: any) {
       setError(err.message);
     }
@@ -53,7 +79,9 @@ export default function PatientsPage() {
 
   return (
     <div>
+      <ModuleFlowBar moduleCode="patient-registration-and-crm" compact />
       <h1 className="page-title">Patient registration</h1>
+      <p className="muted">Step 1 of care flow → next: providers, appointments, clinical encounter</p>
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
       <div className="grid-2" style={{ marginBottom: "1rem" }}>
@@ -91,7 +119,7 @@ export default function PatientsPage() {
           <button type="submit">Create patient</button>
         </form>
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Search</h3>
+          <h3 style={{ marginTop: 0 }}>Search & interconnect</h3>
           <div className="actions" style={{ marginBottom: "0.8rem" }}>
             <input placeholder="Name, phone, MRN" value={query} onChange={(e) => setQuery(e.target.value)} />
             <button type="button" onClick={() => load().catch((e) => setError(e.message))}>Search</button>
@@ -99,20 +127,35 @@ export default function PatientsPage() {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>MRN</th><th>Name</th><th>Phone</th><th>Status</th></tr>
+                <tr><th>MRN</th><th>Name</th><th></th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} style={{ background: selectedId === r.id ? "var(--brand-soft)" : undefined }}>
                     <td>{r.mrn}</td>
                     <td>{r.first_name} {r.last_name}</td>
-                    <td>{r.phone || "—"}</td>
-                    <td><span className="badge">{r.status}</span></td>
+                    <td>
+                      <button type="button" className="secondary" onClick={() => setSelectedId(r.id)}>Chart</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {chart && selectedId && (
+            <div style={{ marginTop: "1rem", borderTop: "1px solid var(--line)", paddingTop: "1rem" }}>
+              <h4>Patient 360° chart</h4>
+              <p className="muted">
+                {chart.appointments.length} appts · {chart.encounters.length} encounters · {chart.invoices.length} bills · {chart.lab_orders?.length || 0} labs
+              </p>
+              <div className="actions">
+                <Link to={`${prefix}/care-journey`} className="button-link">Care journey</Link>
+                <Link to={`${prefix}/appointments`} className="secondary button-link">Book appointment</Link>
+                <Link to={`${prefix}/clinical-hub`} className="secondary button-link">Lab / IPD</Link>
+                <Link to={`${prefix}/billing`} className="secondary button-link">Billing</Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import uuid4, UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -883,7 +883,7 @@ def close_encounter(
 
 
 @router.get("/patients/{patient_id}/chart")
-def get_patient_chart(patient_id: str, ctx: AuthContext = Depends(require_permission("patients:read")), db: Session = Depends(get_db)):
+def get_patient_chart(patient_id: UUID, ctx: AuthContext = Depends(require_permission("patients:read")), db: Session = Depends(get_db)):
     return patient_chart(db, ctx.tenant_id, patient_id)
 
 

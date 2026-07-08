@@ -105,6 +105,21 @@ def list_reports(ctx: AuthContext = Depends(require_tenant), db: Session = Depen
     return [{"code": r.code, "name": r.name, "audience": r.audience, "module_code": r.module_code} for r in rows]
 
 
+@router.get("/platform/module-flow")
+def get_module_flow(ctx: AuthContext = Depends(require_tenant)):
+    from app.data.module_flow import build_module_flow_response
+    return build_module_flow_response()
+
+
+@router.get("/platform/module-flow/{module_code}")
+def get_module_flow_detail(module_code: str, ctx: AuthContext = Depends(require_tenant)):
+    from app.data.module_flow import flow_for_module
+    detail = flow_for_module(module_code)
+    if not detail:
+        raise HTTPException(404, "Module not in flow catalog")
+    return detail
+
+
 @router.get("/modules/{module_code}")
 def list_module_records(
     module_code: str,

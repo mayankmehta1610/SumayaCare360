@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import ModuleFlowBar from "../components/ModuleFlowBar";
 
 export default function BillingPage() {
   const [patients, setPatients] = useState<any[]>([]);
@@ -67,8 +69,14 @@ export default function BillingPage() {
 
   return (
     <div>
+      <ModuleFlowBar moduleCode="billing-tariff-and-payments" compact />
       <h1 className="page-title">Billing</h1>
       <p className="muted">Invoices auto-created on OPD/IPD discharge. Manual invoices also supported. Payments use gateway tokens only (PCI).</p>
+      <div className="actions" style={{ marginBottom: "1rem" }}>
+        <Link to="/modules/insurance-and-claims" className="secondary button-link">Insurance claims</Link>
+        <Link to="/modules/revenue-cycle-management" className="secondary button-link">Revenue cycle</Link>
+        <Link to="/hubs/finance" className="secondary button-link">Finance hub</Link>
+      </div>
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
       <div className="grid-2">

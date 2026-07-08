@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
+import ModuleFlowBar from "../components/ModuleFlowBar";
 
 export default function AppointmentsPage() {
   const [searchParams] = useSearchParams();
@@ -76,6 +77,7 @@ export default function AppointmentsPage() {
 
   return (
     <div>
+      <ModuleFlowBar moduleCode="appointment-and-queue-management" compact />
       <h1 className="page-title">Appointments & queue</h1>
       {statusFilter && <p className="muted">Filtered by status: <strong>{statusFilter}</strong></p>}
       {error && <div className="error">{error}</div>}

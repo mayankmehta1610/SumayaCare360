@@ -164,10 +164,29 @@ def patient_chart(db: Session, tenant_id: UUID, patient_id: UUID) -> dict:
     ipd = db.query(m.IpdAdmission).filter(
         m.IpdAdmission.tenant_id == tenant_id, m.IpdAdmission.patient_id == patient_id
     ).order_by(m.IpdAdmission.created_at.desc()).limit(10).all()
+    lab_orders = db.query(m.LabOrder).filter(
+        m.LabOrder.tenant_id == tenant_id, m.LabOrder.patient_id == patient_id, m.LabOrder.is_deleted == False
+    ).order_by(m.LabOrder.created_at.desc()).limit(10).all()
+    claims = db.query(m.InsuranceClaim).filter(
+        m.InsuranceClaim.tenant_id == tenant_id, m.InsuranceClaim.patient_id == patient_id
+    ).order_by(m.InsuranceClaim.created_at.desc()).limit(10).all()
+    module_records = db.query(m.ModuleRecord).filter(
+        m.ModuleRecord.tenant_id == tenant_id, m.ModuleRecord.patient_id == patient_id, m.ModuleRecord.is_deleted == False
+    ).order_by(m.ModuleRecord.created_at.desc()).limit(15).all()
     return {
         "patient": {"id": str(patient.id), "mrn": patient.mrn, "name": f"{patient.first_name} {patient.last_name}"},
         "appointments": [{"id": str(a.id), "queue_token": a.queue_token, "status": a.status, "scheduled_at": a.scheduled_at.isoformat() if a.scheduled_at else None, "mode": a.mode} for a in appointments],
         "encounters": [{"id": str(e.id), "status": e.status, "chief_complaint": e.chief_complaint, "encounter_type": e.encounter_type} for e in encounters],
         "invoices": [{"id": str(i.id), "invoice_no": i.invoice_no, "total": float(i.total or 0), "status": i.status, "encounter_id": str(i.encounter_id) if i.encounter_id else None} for i in invoices],
         "ipd_admissions": [{"id": str(a.id), "admission_no": a.admission_no, "bed_code": a.bed_code, "status": a.status} for a in ipd],
+        "lab_orders": [{"id": str(l.id), "order_no": l.order_no, "test_code": l.test_code, "status": l.status} for l in lab_orders],
+        "insurance_claims": [{"id": str(c.id), "claim_no": c.claim_no, "payer_code": c.payer_code, "status": c.status, "amount": float(c.amount or 0)} for c in claims],
+        "module_workflows": [{"id": str(r.id), "module_code": r.module_code, "submodule": r.submodule, "title": r.title, "status": r.status, "reference_no": r.reference_no} for r in module_records],
+        "journey_links": {
+            "care_journey": f"/care-journey?patient={patient.id}",
+            "book_appointment": f"/appointments?patient={patient.id}",
+            "clinical_hub": f"/clinical-hub?patient={patient.id}",
+            "billing": f"/billing?patient={patient.id}",
+            "portal": "/portal",
+        },
     }

@@ -3,57 +3,75 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
 
-type Mod = { code: string; name: string; category: string; route: string; is_dedicated: boolean };
+type FlowModule = {
+  code: string;
+  name: string;
+  route: string;
+  is_dedicated: boolean;
+  super_only?: boolean;
+};
 
-const STATIC_LINKS = [
-  { to: "/dashboard", label: "Dashboard", category: "Overview" },
-  { to: "/care-journey", label: "Care Journey (E2E)", category: "Clinical" },
-  { to: "/portal", label: "Patient portal", category: "Engagement" },
-  { to: "/administration", label: "Administration", category: "Administration" },
-  { to: "/clinical-hub", label: "Lab / IPD / Claims", category: "Clinical" },
-  { to: "/masters", label: "Configuration Masters", category: "Platform" },
-  { to: "/reports", label: "Reports & BI", category: "Analytics" },
-  { to: "/notifications", label: "Notifications", category: "Engagement" },
-  { to: "/engineering", label: "Engineering APIs", category: "Platform" },
-  { to: "/audit", label: "Audit & Governance", category: "Platform" },
-  { to: "/settings/mfa", label: "MFA settings", category: "Platform" },
-  { to: "/tenants", label: "Tenants (Super)", category: "Platform", superOnly: true },
+type Phase = {
+  id: string;
+  name: string;
+  hub_route: string;
+  icon: string;
+  modules: FlowModule[];
+};
+
+const EXTRA_LINKS = [
+  { to: "/dashboard", label: "Dashboard", phase: "_top" },
+  { to: "/module-map", label: "Module map", phase: "_top" },
+  { to: "/care-journey", label: "Care journey (E2E)", phase: "clinical" },
+  { to: "/tenants", label: "Tenants (Super)", phase: "_top", superOnly: true },
 ];
 
 export default function AppLayout() {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
-  const [modules, setModules] = useState<Mod[]>([]);
+  const [phases, setPhases] = useState<Phase[]>([]);
 
   useEffect(() => {
-    api<Mod[]>("/platform/modules").then(setModules).catch(() => setModules([]));
+    api<{ phases: Phase[] }>("/platform/module-flow")
+      .then((d) => setPhases(d.phases))
+      .catch(() => setPhases([]));
   }, []);
 
   const nav = useMemo(() => {
     const prefix = session?.tenant_code ? `/${session.tenant_code}` : "";
     const withPrefix = (to: string) => (to.startsWith("/") ? `${prefix}${to}` : to);
-    const dedicated = modules.filter((m) => m.is_dedicated).map((m) => ({
-      to: withPrefix(m.route),
-      label: m.name,
-      category: m.category,
-    }));
-    const generic = modules
-      .filter((m) => !m.is_dedicated)
-      .map((m) => ({
-        to: withPrefix(m.route.startsWith("/modules/") ? m.route : `/modules/${m.code}`),
-        label: m.name,
-        category: m.category,
-      }));
-    const all = [...STATIC_LINKS.map((s) => ({ ...s, to: withPrefix(s.to) })), ...dedicated, ...generic];
-    const byCat: Record<string, typeof all> = {};
-    for (const item of all) {
-      if ((item as any).superOnly && session?.role_code !== "SUPER_ADMIN") continue;
-      const c = item.category || "Other";
-      byCat[c] = byCat[c] || [];
-      if (!byCat[c].some((x) => x.to === item.to)) byCat[c].push(item);
+
+    const groups: { key: string; label: string; items: { to: string; label: string }[] }[] = [];
+
+    const topItems = EXTRA_LINKS.filter(
+      (l) => !l.superOnly || session?.role_code === "SUPER_ADMIN"
+    ).map((l) => ({ to: withPrefix(l.to), label: l.label }));
+    groups.push({ key: "_top", label: "Overview", items: topItems });
+
+    for (const phase of phases) {
+      const hubLink = { to: withPrefix(phase.hub_route), label: `${phase.icon} ${phase.name.split("·")[1]?.trim() || phase.name}` };
+      const moduleLinks = phase.modules
+        .filter((m) => !m.super_only || session?.role_code === "SUPER_ADMIN")
+        .filter((m) => !m.code.startsWith("_"))
+        .map((m) => ({
+          to: withPrefix(m.route),
+          label: m.name.length > 28 ? m.name.slice(0, 26) + "…" : m.name,
+        }));
+      const seen = new Set<string>();
+      const items = [hubLink, ...moduleLinks].filter((item) => {
+        if (seen.has(item.to)) return false;
+        seen.add(item.to);
+        return true;
+      });
+      groups.push({
+        key: phase.id,
+        label: phase.name,
+        items,
+      });
     }
-    return byCat;
-  }, [modules, session?.role_code]);
+
+    return groups;
+  }, [phases, session?.role_code, session?.tenant_code]);
 
   return (
     <div className="app-shell">
@@ -63,10 +81,10 @@ export default function AppLayout() {
           {session?.tenant_code ? `/${session.tenant_code}` : "Super Admin"} · {session?.role_code}
         </div>
         <nav className="nav">
-          {Object.entries(nav).map(([cat, items]) => (
-            <div key={cat} className="nav-group">
-              <div className="nav-cat">{cat}</div>
-              {items.map((l) => (
+          {nav.map((group) => (
+            <div key={group.key} className="nav-group">
+              <div className="nav-cat">{group.label}</div>
+              {group.items.map((l) => (
                 <NavLink key={l.to} to={l.to} className={({ isActive }) => (isActive ? "active" : "")}>
                   {l.label}
                 </NavLink>
