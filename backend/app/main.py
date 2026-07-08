@@ -15,6 +15,7 @@ from app.api.v1.ot_router import router as ot_router
 from app.api.v1.dedicated_router import router as dedicated_router
 from app.middleware.api_audit import ApiAuditMiddleware
 from app.db.session import Base, engine
+from app.models import entities as m
 import app.models.entities  # noqa: F401 — register models
 
 settings = get_settings()
@@ -53,9 +54,19 @@ def on_startup():
     Base.metadata.create_all(bind=engine)
     from app.db.session import SessionLocal
     from app.services.modules import sync_platform_modules
+    from app.db.demo_data import seed_demo_replay
     db = SessionLocal()
     try:
         sync_platform_modules(db, None)
         db.commit()
+        # Ensure demo tenant has full replay dataset after every deploy/restart
+        tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
+        if tenant:
+            seed_demo_replay(db)
+    except Exception as exc:
+        import traceback
+        print(f"Startup seed warning: {exc}")
+        traceback.print_exc()
+        db.rollback()
     finally:
         db.close()

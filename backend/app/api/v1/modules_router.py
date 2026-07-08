@@ -5,7 +5,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.db.session import get_db
-from app.core.deps import AuthContext, require_tenant, resolve_tenant_context, get_current_context
+from app.core.deps import AuthContext, require_tenant, resolve_tenant_context, get_current_context, require_permission
+from app.core.security import hash_password
+from app.schemas.schemas import UserCreate
 from app.models import entities as m
 from app.services import modules as mod_svc
 from app.services.care_journey import discharge_ipd
@@ -424,3 +426,49 @@ def list_room_categories(ctx: AuthContext = Depends(resolve_tenant_context), db:
 def list_beds(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     rows = db.query(m.Bed).filter(m.Bed.tenant_id == ctx.tenant_id).all()
     return [{"id": str(r.id), "bed_code": r.bed_code, "room_code": r.room_code, "status": r.status, "category_code": r.category_code} for r in rows]
+
+
+@router.patch("/admin/beds/{bed_id}")
+def patch_bed(
+    bed_id: UUID,
+    status: str = Query(...),
+    ctx: AuthContext = Depends(require_permission("masters:*")),
+    db: Session = Depends(get_db),
+):
+    row = db.query(m.Bed).filter(m.Bed.id == bed_id, m.Bed.tenant_id == ctx.tenant_id).first()
+    if not row:
+        raise HTTPException(404, "Bed not found")
+    allowed = {"available", "occupied", "maintenance", "housekeeping"}
+    if status not in allowed:
+        raise HTTPException(400, f"Status must be one of: {sorted(allowed)}")
+    row.status = status
+    row.updated_by = ctx.user.id
+    db.commit()
+    return {"id": str(row.id), "bed_code": row.bed_code, "status": row.status}
+
+
+@router.post("/admin/users")
+def create_user(
+    payload: UserCreate,
+    ctx: AuthContext = Depends(require_permission("users:*")),
+    db: Session = Depends(get_db),
+):
+    existing = db.query(m.User).filter(
+        m.User.tenant_id == ctx.tenant_id, m.User.email == payload.email, m.User.is_deleted == False
+    ).first()
+    if existing:
+        raise HTTPException(400, "Email already registered")
+    row = m.User(
+        tenant_id=ctx.tenant_id,
+        branch_id=payload.branch_id or ctx.user.branch_id,
+        email=payload.email,
+        full_name=payload.full_name,
+        hashed_password=hash_password(payload.password),
+        role_code=payload.role_code,
+        status="active",
+        created_by=ctx.user.id,
+        updated_by=ctx.user.id,
+    )
+    db.add(row)
+    db.commit()
+    return {"id": str(row.id), "email": row.email, "full_name": row.full_name, "role_code": row.role_code, "status": row.status}

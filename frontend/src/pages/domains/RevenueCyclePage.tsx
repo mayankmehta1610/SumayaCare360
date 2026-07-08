@@ -65,6 +65,12 @@ export default function RevenueCyclePage() {
     await loadBase();
   }
 
+  async function setClaimStatus(id: string, status: string) {
+    await api(`/finance/claims/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+    setMsg(`Claim → ${status}`);
+    await loadBase();
+  }
+
   return (
     <div>
       <ModuleFlowBar moduleCode="revenue-cycle-management" compact />
@@ -88,7 +94,7 @@ export default function RevenueCyclePage() {
       {tab === "claims" && (
         <div className="card table-wrap">
           <table>
-            <thead><tr><th>Claim</th><th>Payer</th><th>Amount</th><th>Status</th></tr></thead>
+            <thead><tr><th>Claim</th><th>Payer</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
               {claims.map((c) => (
                 <tr key={c.id}>
@@ -96,6 +102,11 @@ export default function RevenueCyclePage() {
                   <td>{c.payer_code}</td>
                   <td>₹{c.amount}</td>
                   <td><span className="badge">{c.status}</span></td>
+                  <td className="actions">
+                    {(c.allowed_next_statuses || []).map((s: string) => (
+                      <button key={s} type="button" className="secondary" onClick={() => setClaimStatus(c.id, s).catch((e) => setError(e.message))}>→ {s}</button>
+                    ))}
+                  </td>
                 </tr>
               ))}
             </tbody>

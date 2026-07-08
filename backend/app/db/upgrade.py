@@ -40,6 +40,10 @@ def upgrade():
         aid = admin.id if admin else None
         branch = db.query(m.Branch).filter(m.Branch.tenant_id == tenant.id).first()
 
+        role = db.query(m.Role).filter(m.Role.code == "TENANT_ADMIN", m.Role.tenant_id.is_(None)).first()
+        if role and "config:*" not in (role.permissions or []):
+            role.permissions = list(role.permissions or []) + ["config:*", "vitals:*", "prescriptions:*"]
+
         if db.query(m.Bed).filter(m.Bed.tenant_id == tenant.id).count() == 0:
             for room, bed in [("R101", "B101"), ("R101", "B102"), ("R201", "B201"), ("ICU1", "ICU-B1")]:
                 db.add(m.Bed(

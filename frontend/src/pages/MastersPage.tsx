@@ -19,7 +19,7 @@ const RESOURCES = [
   "beds",
 ];
 
-const CREATABLE = new Set(["tariffs", "medicines", "lab-tests"]);
+const CREATABLE = new Set(["tariffs", "medicines", "lab-tests", "room-categories", "beds", "insurance-payers", "diseases", "notification-templates"]);
 
 type CreateForm = {
   code: string;

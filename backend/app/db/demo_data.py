@@ -25,11 +25,12 @@ def _aid(db: Session, tenant_id: UUID) -> UUID:
 
 
 def is_demo_loaded(db: Session, tenant_id: UUID) -> bool:
-    return db.query(m.Patient).filter(
+    count = db.query(m.Patient).filter(
         m.Patient.tenant_id == tenant_id,
-        m.Patient.mrn == DEMO_PATIENT_MRN,
+        m.Patient.mrn.like("DEMO-%"),
         m.Patient.is_deleted == False,
-    ).first() is not None
+    ).count()
+    return count >= 8
 
 
 def seed_demo_replay(db: Session, *, force: bool = False) -> None:

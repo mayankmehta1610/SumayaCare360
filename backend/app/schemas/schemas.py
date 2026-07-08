@@ -48,6 +48,14 @@ class DepartmentCreate(BaseModel):
     branch_id: Optional[UUID] = None
 
 
+class UserCreate(BaseModel):
+    email: EmailStr
+    full_name: str
+    role_code: str
+    password: str = Field(min_length=8)
+    branch_id: Optional[UUID] = None
+
+
 class DepartmentOut(BaseModel):
     id: UUID
     code: str

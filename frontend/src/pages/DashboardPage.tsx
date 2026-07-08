@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -18,27 +18,57 @@ export default function DashboardPage() {
   const [kpis, setKpis] = useState<Kpi[]>([]);
   const [phases, setPhases] = useState<Phase[]>([]);
   const [error, setError] = useState("");
+  const [msg, setMsg] = useState("");
+  const [loadingDemo, setLoadingDemo] = useState(false);
   const navigate = useNavigate();
   const { session } = useAuth();
   const prefix = session?.tenant_code ? `/${session.tenant_code}` : "";
+  const patientCount = kpis.find((k) => k.code === "patients")?.value ?? 0;
+  const isAdmin = session?.role_code === "TENANT_ADMIN" || session?.role_code === "SUPER_ADMIN";
 
-  useEffect(() => {
-    Promise.all([
+  async function load() {
+    const [kpiData, flowData] = await Promise.all([
       api<{ kpis: Kpi[] }>("/dashboard/summary"),
       api<{ phases: Phase[] }>("/platform/module-flow"),
-    ])
-      .then(([kpiData, flowData]) => {
-        setKpis(kpiData.kpis);
-        setPhases(flowData.phases);
-      })
-      .catch((e) => setError(e.message));
+    ]);
+    setKpis(kpiData.kpis);
+    setPhases(flowData.phases);
+  }
+
+  useEffect(() => {
+    load().catch((e) => setError(e.message));
   }, []);
+
+  async function reloadDemo() {
+    setLoadingDemo(true);
+    setError("");
+    try {
+      const res = await api<{ patients: number; reloaded: boolean }>("/admin/demo-reload", { method: "POST" });
+      setMsg(`Demo data loaded — ${res.patients} patients in database`);
+      await load();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoadingDemo(false);
+    }
+  }
 
   return (
     <div>
       <h1 className="page-title">Operations dashboard</h1>
-      <p className="muted">Click KPIs to drill down · follow phased modules for the full hospital workflow</p>
+      <p className="muted">All KPIs load from PostgreSQL · click to drill down</p>
       {error && <div className="error">{error}</div>}
+      {msg && <div className="success">{msg}</div>}
+
+      {patientCount < 5 && isAdmin && (
+        <div className="card" style={{ marginBottom: "1rem", borderColor: "var(--warn, #c90)" }}>
+          <h3 style={{ marginTop: 0 }}>Database is empty or incomplete</h3>
+          <p className="muted">Load the full demo replay dataset (8 patients, lab, IPD, claims, all 36 modules).</p>
+          <button type="button" disabled={loadingDemo} onClick={() => reloadDemo()}>
+            {loadingDemo ? "Loading…" : "Load demo data now"}
+          </button>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: "1.25rem", background: "linear-gradient(135deg, var(--brand-soft), #fff)" }}>
         <h3 style={{ marginTop: 0 }}>Care journey — start here</h3>

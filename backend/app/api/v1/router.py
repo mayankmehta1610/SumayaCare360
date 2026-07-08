@@ -22,7 +22,13 @@ def _client_meta(request: Request):
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "service": "sumayacare360-api", "time": datetime.now(timezone.utc).isoformat()}
+    import os
+    return {
+        "status": "ok",
+        "service": "sumayacare360-api",
+        "time": datetime.now(timezone.utc).isoformat(),
+        "build": os.getenv("RENDER_GIT_COMMIT", "local")[:8],
+    }
 
 
 # ───────────────────────── Auth ─────────────────────────
@@ -396,11 +402,11 @@ def create_department(payload: DepartmentCreate, ctx: AuthContext = Depends(requ
 
 
 @router.post("/admin/demo-reload")
-def reload_demo_data(ctx: AuthContext = Depends(require_permission("config:*")), db: Session = Depends(get_db)):
+def reload_demo_data(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
     """Reload demo replay dataset for current tenant (admin only)."""
+    if ctx.role_code not in ("TENANT_ADMIN", "SUPER_ADMIN") and not ctx.user.is_super_admin:
+        raise HTTPException(403, "Tenant admin required")
     from app.db.demo_data import seed_demo_replay, is_demo_loaded
-    if ctx.tenant_code != "demo" and not ctx.user.is_super_admin:
-        raise HTTPException(403, "Demo reload only allowed on demo tenant")
     was_loaded = is_demo_loaded(db, ctx.tenant_id)
     seed_demo_replay(db, force=was_loaded)
     patients = db.query(m.Patient).filter(m.Patient.tenant_id == ctx.tenant_id, m.Patient.is_deleted == False).count()
