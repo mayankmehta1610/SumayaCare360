@@ -1,27 +1,16 @@
-# SUMAYA Care 360 — Render Blueprint
-# Deploy: Render Dashboard → New → Blueprint → connect this repo
+# SUMAYA Care 360 - Render Blueprint
 
 databases:
   - name: sumayacare360-db
     plan: free
-    databaseName: sumayacare360
-    user: sumaya
+    postgresMajorVersion: "16"
 
 services:
-  # Redis — notification queue / cache
-  - type: keyvalue
-    name: sumayacare360-redis
-    plan: free
-    ipAllowList:
-      - source: 0.0.0.0/0
-        description: everywhere
-    maxmemoryPolicy: allkeys-lru
-
-  # FastAPI backend
   - type: web
     name: sumayacare360-api
     runtime: python
     plan: free
+    region: oregon
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     preDeployCommand: python -m app.db.seed
@@ -32,50 +21,23 @@ services:
         value: "3.12.0"
       - key: APP_ENV
         value: production
-      - key: SEED_ON_START
-        value: "false"
       - key: DATABASE_URL
         fromDatabase:
           name: sumayacare360-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: sumayacare360-redis
-          property: connectionString
       - key: JWT_SECRET
         generateValue: true
-      - key: JWT_ALGORITHM
-        value: HS256
-      - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: "480"
       - key: CORS_ORIGINS
         value: https://sumayacare360-web.onrender.com
-      # Optional: override with S3-compatible storage (AWS S3, Cloudflare R2, etc.)
-      - key: S3_ENDPOINT
-        value: ""
-      - key: S3_ACCESS_KEY
-        value: ""
-      - key: S3_SECRET_KEY
-        value: ""
-      - key: S3_BUCKET
-        value: sumaya-docs
 
-  # React frontend (Vite static site)
   - type: web
     name: sumayacare360-web
     runtime: static
     plan: free
-    rootDir: frontend
-    buildCommand: npm install && VITE_API_BASE="$TEMP_API_URL/api/v1" npm run build
+    region: oregon
+    buildCommand: cd frontend && npm install && VITE_API_BASE=https://sumayacare360-api.onrender.com/api/v1 npm run build
     staticPublishPath: ./frontend/dist
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
-    envVars:
-      - key: TEMP_API_URL
-        fromService:
-          type: web
-          name: sumayacare360-api
-          envVarKey: RENDER_EXTERNAL_URL
