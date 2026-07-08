@@ -14,8 +14,11 @@ Multi-tenant Hospital, Clinic & Telemedicine platform built from the enterprise 
 
 ## Quick start
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/mayankmehta1610/SumayaCare360)
+
+### Local (Docker)
+
 ```bash
-cd C:\Code\SumayaCare360
 docker compose up --build -d
 ```
 
