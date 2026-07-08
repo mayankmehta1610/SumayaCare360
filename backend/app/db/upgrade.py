@@ -84,9 +84,12 @@ def upgrade():
         print("Upgrade complete")
     except Exception as exc:
         import traceback
-        print(f"Upgrade failed: {exc}")
+        print(f"Upgrade warning (API will still start): {exc}")
         traceback.print_exc()
-        raise
+        try:
+            db.rollback()
+        except Exception:
+            pass
     finally:
         db.close()
 

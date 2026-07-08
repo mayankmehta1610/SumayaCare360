@@ -21,13 +21,24 @@ def _client_meta(request: Request):
 
 
 @router.get("/health")
-def health():
+def health(db: Session = Depends(get_db)):
     import os
+    demo_patients = 0
+    try:
+        tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
+        if tenant:
+            demo_patients = db.query(m.Patient).filter(
+                m.Patient.tenant_id == tenant.id, m.Patient.is_deleted == False
+            ).count()
+    except Exception:
+        pass
     return {
         "status": "ok",
         "service": "sumayacare360-api",
         "time": datetime.now(timezone.utc).isoformat(),
         "build": os.getenv("RENDER_GIT_COMMIT", "local")[:8],
+        "demo_patients": demo_patients,
+        "data_ready": demo_patients > 0,
     }
 
 

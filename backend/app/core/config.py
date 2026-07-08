@@ -9,9 +9,12 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def normalize_database_url(cls, value: str) -> str:
-        # Render Postgres provides postgresql://; SQLAlchemy needs the psycopg2 driver.
-        if isinstance(value, str) and value.startswith("postgresql://"):
-            return value.replace("postgresql://", "postgresql+psycopg2://", 1)
+        # Render Postgres may provide postgres:// or postgresql:// — SQLAlchemy needs psycopg2 driver.
+        if isinstance(value, str):
+            if value.startswith("postgres://"):
+                return value.replace("postgres://", "postgresql+psycopg2://", 1)
+            if value.startswith("postgresql://"):
+                return value.replace("postgresql://", "postgresql+psycopg2://", 1)
         return value
     redis_url: str = "redis://localhost:6379/0"
     jwt_secret: str = "sumaya-care-360-dev-jwt-secret-change-in-prod"

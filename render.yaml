@@ -28,6 +28,8 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         value: https://sumayacare360-web.onrender.com
+      - key: DEMO_REPLAY_FORCE
+        value: "false"
 
   - type: web
     name: sumayacare360-web
