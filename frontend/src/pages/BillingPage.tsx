@@ -24,6 +24,19 @@ export default function BillingPage() {
     load().catch((e) => setError(e.message));
   }, []);
 
+  async function createEstimate(e: FormEvent) {
+    e.preventDefault();
+    const est = await api<any>("/billing/estimates", {
+      method: "POST",
+      body: JSON.stringify({
+        patient_id: form.patient_id,
+        lines: [{ tariff_code: form.tariff_code, qty: 1 }],
+      }),
+    });
+    setMsg(`Estimate ${est.estimate_no} — ₹${est.total}`);
+    await load();
+  }
+
   async function createInvoice(e: FormEvent) {
     e.preventDefault();
     const inv = await api<any>("/billing/invoices", {
@@ -84,6 +97,9 @@ export default function BillingPage() {
             </select>
           </div>
           <button type="submit">Issue invoice</button>
+          <button type="button" className="secondary" style={{ marginLeft: "0.5rem" }} onClick={(e) => createEstimate(e).catch((err) => setError(err.message))}>
+            Create estimate
+          </button>
         </form>
         <div className="card table-wrap">
           <table>

@@ -24,30 +24,16 @@ docker compose up --build -d
 
 ### Docker not starting? (HP / Windows)
 
-If Docker Desktop shows **"Virtualization support not detected"**:
+If Docker Desktop shows **"Virtualization support not detected"**, BIOS virtualization must be enabled manually (F10 → enable **SVM Mode** on HP 245 G7). That cannot be changed from Windows.
 
-1. **Enable virtualization in BIOS** (required on this machine — firmware currently reports disabled):
-   - Reboot → press **F10** (HP 245 G7)
-   - **Advanced** → **System Options** (or **Configuration**)
-   - Enable **SVM Mode** / **AMD-V** / **Virtualization Technology**
-   - Save (F10) and reboot
+**Run without Docker instead** (works now on this machine):
 
-2. **Run admin setup script** (WSL + Windows features):
-   ```powershell
-   # Right-click PowerShell -> Run as administrator
-   cd C:\Code\SumayaCare360
-   .\scripts\enable-docker-prereqs.ps1
-   ```
-   Approve the UAC prompt if it appears.
+```powershell
+cd C:\Code\SumayaCare360
+.\scripts\run-native.ps1
+```
 
-3. **Reboot**, open **Docker Desktop**, wait until engine is running.
-
-4. **Start the stack**:
-   ```powershell
-   cd C:\Code\SumayaCare360
-   docker compose up --build -d
-   .\scripts\smoke.ps1
-   ```
+Uses Python + SQLite + Vite (no virtualization required). For full Docker stack after BIOS fix:
 
 | Service | URL |
 |--------|-----|

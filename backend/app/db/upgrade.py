@@ -1,0 +1,40 @@
+"""Upgrade seed data for existing databases."""
+from app.db.session import SessionLocal, engine, Base
+from app.models import entities as m
+from app.services.modules import sync_platform_modules
+import app.models.entities  # noqa
+
+
+def upgrade():
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        sync_platform_modules(db, None)
+        tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
+        if not tenant:
+            print("No demo tenant — run full seed")
+            return
+        admin = db.query(m.User).filter(m.User.is_super_admin == True).first()
+        aid = admin.id if admin else None
+        branch = db.query(m.Branch).filter(m.Branch.tenant_id == tenant.id).first()
+
+        if db.query(m.Bed).filter(m.Bed.tenant_id == tenant.id).count() == 0:
+            for room, bed in [("R101", "B101"), ("R101", "B102"), ("R201", "B201"), ("ICU1", "ICU-B1")]:
+                db.add(m.Bed(tenant_id=tenant.id, branch_id=branch.id if branch else None,
+                             room_code=room, bed_code=bed, category_code="ICU" if "ICU" in room else "GEN",
+                             status="available", created_by=aid, updated_by=aid))
+        if db.query(m.InsurancePayer).filter(m.InsurancePayer.tenant_id == tenant.id).count() == 0:
+            for code, name in [("STAR", "Star Health"), ("ICICI", "ICICI Lombard")]:
+                db.add(m.InsurancePayer(tenant_id=tenant.id, code=code, name=name, created_by=aid, updated_by=aid))
+        if db.query(m.ReportDefinition).count() == 0 and aid:
+            db.add(m.ReportDefinition(tenant_id=tenant.id, code="opd-dashboard", name="OPD Dashboard",
+                                      audience="Operations", module_code="appointment-and-queue-management",
+                                      created_by=aid, updated_by=aid))
+        db.commit()
+        print("Upgrade complete")
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    upgrade()

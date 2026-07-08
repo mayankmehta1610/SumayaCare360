@@ -12,10 +12,22 @@ import BillingPage from "./pages/BillingPage";
 import MastersPage from "./pages/MastersPage";
 import AuditPage from "./pages/AuditPage";
 import TenantsPage from "./pages/TenantsPage";
+import ModulePage from "./pages/ModulePage";
+import AdministrationPage from "./pages/AdministrationPage";
+import ClinicalHubPage from "./pages/ClinicalHubPage";
+import ReportsPage from "./pages/ReportsPage";
+import NotificationsPage from "./pages/NotificationsPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
   if (!session) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function SuperAdminRoute({ children }: { children: React.ReactNode }) {
+  const { session } = useAuth();
+  if (!session) return <Navigate to="/login" replace />;
+  if (session.role_code !== "SUPER_ADMIN") return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -41,7 +53,19 @@ export default function App() {
         <Route path="billing" element={<BillingPage />} />
         <Route path="masters" element={<MastersPage />} />
         <Route path="audit" element={<AuditPage />} />
-        <Route path="tenants" element={<TenantsPage />} />
+        <Route path="administration" element={<AdministrationPage />} />
+        <Route path="clinical-hub" element={<ClinicalHubPage />} />
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="modules/:moduleCode" element={<ModulePage />} />
+        <Route
+          path="tenants"
+          element={
+            <SuperAdminRoute>
+              <TenantsPage />
+            </SuperAdminRoute>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

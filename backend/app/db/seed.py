@@ -187,6 +187,86 @@ def seed():
                 created_by=super_admin.id, updated_by=super_admin.id,
             ))
 
+        for code, name in [("OPD", "Outpatient"), ("ER", "Emergency"), ("LAB", "Laboratory")]:
+            db.add(m.Department(
+                tenant_id=tenant.id, branch_id=branch.id, code=code, name=name,
+                created_by=super_admin.id, updated_by=super_admin.id,
+            ))
+
+        for code, name, tclass in [
+            ("GEN", "General Ward", "standard"),
+            ("PVT", "Private Room", "premium"),
+            ("ICU", "Intensive Care", "critical"),
+        ]:
+            db.add(m.RoomCategory(
+                tenant_id=tenant.id, branch_id=branch.id, code=code, name=name,
+                tariff_class=tclass, nursing_station=f"NS-{code}",
+                created_by=super_admin.id, updated_by=super_admin.id,
+            ))
+        for i, (room, bed) in enumerate([("R101", "B101"), ("R101", "B102"), ("R201", "B201"), ("ICU1", "ICU-B1")], 1):
+            db.add(m.Bed(
+                tenant_id=tenant.id, branch_id=branch.id, room_code=room, bed_code=bed,
+                category_code="ICU" if "ICU" in room else "GEN",
+                status="available", created_by=super_admin.id, updated_by=super_admin.id,
+            ))
+        for code, name, tpa in [
+            ("STAR", "Star Health", "Star TPA"),
+            ("ICICI", "ICICI Lombard", "ICICI TPA"),
+        ]:
+            db.add(m.InsurancePayer(
+                tenant_id=tenant.id, code=code, name=name, tpa_name=tpa,
+                claim_rules={"preauth_required": True},
+                created_by=super_admin.id, updated_by=super_admin.id,
+            ))
+
+        from app.services.modules import sync_platform_modules
+        sync_platform_modules(db, super_admin.id)
+
+        for wf_code, wf_name, mod, steps in [
+            ("patient-opd", "Patient OPD Visit", "opd-clinical-workflow",
+             ["Register", "Book appointment", "Vitals", "Consultation", "Billing"]),
+            ("teleconsult", "Teleconsultation", "telemedicine-and-virtual-care",
+             ["Book slot", "Consent", "Video session", "Notes", "Follow-up"]),
+            ("ipd-admit", "IPD Admission", "ipd-admission-and-ward-management",
+             ["Request", "Eligibility", "Bed allocation", "Assessment", "Discharge"]),
+            ("lab-dx", "Lab Diagnostics", "laboratory-and-diagnostics",
+             ["Order", "Sample", "Processing", "Result", "Notification"]),
+            ("insurance-claim", "Insurance Claim", "insurance-and-claims",
+             ["Policy capture", "Eligibility", "Pre-auth", "Submission", "Settlement"]),
+        ]:
+            db.add(m.WorkflowDefinition(
+                tenant_id=tenant.id, workflow_code=wf_code, name=wf_name,
+                module_code=mod, steps=steps, transitions=[],
+                created_by=super_admin.id, updated_by=super_admin.id,
+            ))
+
+        for code, name, aud, mod in [
+            ("opd-dashboard", "OPD Appointment Dashboard", "Operations", "appointment-and-queue-management"),
+            ("ipd-occupancy", "IPD Occupancy Dashboard", "Admin", "ipd-admission-and-ward-management"),
+            ("lab-tat", "Lab TAT Dashboard", "Lab", "laboratory-and-diagnostics"),
+            ("revenue", "Revenue Dashboard", "Finance", "billing-tariff-and-payments"),
+            ("audit-trail", "Audit Trail Report", "Compliance", "audit-trail-and-governance"),
+            ("executive", "Executive Hospital Dashboard", "Leadership", "reports-bi-and-analytics"),
+        ]:
+            db.add(m.ReportDefinition(
+                tenant_id=tenant.id, code=code, name=name, audience=aud,
+                module_code=mod, filters=["date", "branch"], metrics=["count", "amount"],
+                created_by=super_admin.id, updated_by=super_admin.id,
+            ))
+
+        for code, label, mod, route in [
+            ("patients", "Patients", "patient-registration-and-crm", "/patients"),
+            ("appointments", "Appointments", "appointment-and-queue-management", "/appointments"),
+            ("ipd", "IPD Admissions", "ipd-admission-and-ward-management", "/clinical-hub"),
+            ("lab", "Lab Orders", "laboratory-and-diagnostics", "/clinical-hub"),
+            ("claims", "Insurance Claims", "insurance-and-claims", "/clinical-hub"),
+        ]:
+            db.add(m.KpiDefinition(
+                tenant_id=tenant.id, code=code, label=label,
+                module_code=mod, drilldown_route=route,
+                created_by=super_admin.id, updated_by=super_admin.id,
+            ))
+
         db.commit()
         print("Seed complete: superadmin@sumayacare360.com / SuperAdmin@360 | tenant=demo")
     finally:

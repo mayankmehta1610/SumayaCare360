@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.db.session import get_db
-from app.core.security import hash_password, verify_password, create_access_token
+from app.core.security import hash_password, verify_password, create_access_token, decode_token
 from app.core.deps import (
     AuthContext, get_current_context, require_permission, require_tenant, permissions_for_role
 )
@@ -82,6 +82,47 @@ def me(ctx: AuthContext = Depends(get_current_context)):
     }
 
 
+@router.post("/auth/refresh", response_model=TokenResponse)
+def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)):
+    try:
+        data = decode_token(payload.access_token)
+    except Exception:
+        raise HTTPException(401, "Invalid or expired token")
+    user = db.query(m.User).filter(m.User.id == data.get("sub"), m.User.is_deleted == False).first()
+    if not user:
+        raise HTTPException(401, "User not found")
+    tenant_code = data.get("tenant_code")
+    tenant = None
+    if tenant_code:
+        tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == tenant_code).first()
+    perms = permissions_for_role(user.role_code, db, tenant.id if tenant else None)
+    token = create_access_token({
+        "sub": str(user.id),
+        "tenant_code": tenant_code,
+        "role": user.role_code,
+        "jti": str(uuid4()),
+    })
+    return TokenResponse(
+        access_token=token,
+        tenant_code=tenant_code,
+        role_code=user.role_code,
+        full_name=user.full_name,
+        permissions=perms,
+    )
+
+
+@router.post("/auth/logout")
+def logout(request: Request, ctx: AuthContext = Depends(get_current_context), db: Session = Depends(get_db)):
+    ip, ua = _client_meta(request)
+    write_audit(
+        db, tenant_id=ctx.tenant_id, actor_user_id=ctx.user.id,
+        action="LOGOUT", entity_type="user", entity_id=str(ctx.user.id),
+        ip_address=ip, user_agent=ua, correlation_id=ctx.correlation_id,
+    )
+    db.commit()
+    return {"message": "Logged out"}
+
+
 # ───────────────────────── Super Admin Tenants ─────────────────────────
 @router.get("/super-admin/tenants")
 def list_tenants(ctx: AuthContext = Depends(require_permission("*")), db: Session = Depends(get_db)):
@@ -128,6 +169,24 @@ def create_tenant(payload: TenantCreate, request: Request, ctx: AuthContext = De
     db.commit()
     db.refresh(tenant)
     return TenantOut.model_validate(tenant)
+
+
+@router.post("/super-admin/tenants/{tenant_id}/activate")
+def activate_tenant(tenant_id: str, request: Request, ctx: AuthContext = Depends(require_permission("*")), db: Session = Depends(get_db)):
+    tenant = db.query(m.Tenant).filter(m.Tenant.id == tenant_id, m.Tenant.is_deleted == False).first()
+    if not tenant:
+        raise HTTPException(404, "Tenant not found")
+    tenant.status = "active"
+    tenant.updated_by = ctx.user.id
+    ip, ua = _client_meta(request)
+    write_audit(
+        db, tenant_id=tenant.id, actor_user_id=ctx.user.id, action="ACTIVATE",
+        entity_type="tenant", entity_id=str(tenant.id),
+        new_values={"status": "active"}, ip_address=ip, user_agent=ua,
+        correlation_id=ctx.correlation_id,
+    )
+    db.commit()
+    return {"id": str(tenant.id), "status": tenant.status}
 
 
 def _seed_tenant_defaults(db: Session, tenant_id, user_id):
@@ -203,6 +262,29 @@ def create_branch(payload: BranchCreate, ctx: AuthContext = Depends(require_perm
     return row
 
 
+@router.get("/admin/departments", response_model=list[DepartmentOut])
+def list_departments(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+    rows = db.query(m.Department).filter(
+        m.Department.tenant_id == ctx.tenant_id, m.Department.is_deleted == False
+    ).order_by(m.Department.name).all()
+    return rows
+
+
+@router.post("/admin/departments", response_model=DepartmentOut)
+def create_department(payload: DepartmentCreate, ctx: AuthContext = Depends(require_permission("config:*")), db: Session = Depends(get_db)):
+    row = m.Department(
+        tenant_id=ctx.tenant_id, branch_id=payload.branch_id,
+        code=payload.code, name=payload.name,
+        created_by=ctx.user.id, updated_by=ctx.user.id,
+    )
+    db.add(row)
+    write_audit(db, tenant_id=ctx.tenant_id, actor_user_id=ctx.user.id, action="CREATE",
+                entity_type="department", new_values=payload.model_dump(), correlation_id=ctx.correlation_id)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 # ───────────────────────── Masters ─────────────────────────
 @router.get("/masters/{resource}")
 def list_masters(resource: str, ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
@@ -220,6 +302,9 @@ def list_masters(resource: str, ctx: AuthContext = Depends(require_tenant), db: 
         "video-providers": (m.VideoProvider, False),
         "location-purposes": (m.LocationPurpose, True),
         "ui-actions": (m.UIActionRegistry, False),
+        "insurance-payers": (m.InsurancePayer, True),
+        "room-categories": (m.RoomCategory, True),
+        "beds": (m.Bed, True),
     }
     if resource not in mapping:
         raise HTTPException(404, f"Unknown master: {resource}")
@@ -316,6 +401,28 @@ def get_patient(patient_id: str, ctx: AuthContext = Depends(require_permission("
     return row
 
 
+@router.patch("/patients/{patient_id}", response_model=PatientOut)
+def update_patient(patient_id: str, payload: PatientUpdate, ctx: AuthContext = Depends(require_permission("patients:*")), db: Session = Depends(get_db)):
+    row = db.query(m.Patient).filter(
+        m.Patient.id == patient_id, m.Patient.tenant_id == ctx.tenant_id, m.Patient.is_deleted == False
+    ).first()
+    if not row:
+        raise HTTPException(404, "Patient not found")
+    old = {"first_name": row.first_name, "last_name": row.last_name, "phone": row.phone, "status": row.status}
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        if field == "email" and value is not None:
+            value = str(value)
+        setattr(row, field, value)
+    row.updated_by = ctx.user.id
+    write_audit(db, tenant_id=ctx.tenant_id, actor_user_id=ctx.user.id, action="UPDATE",
+                entity_type="patient", entity_id=str(row.id),
+                old_values=old, new_values=payload.model_dump(exclude_unset=True),
+                correlation_id=ctx.correlation_id)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 # ───────────────────────── Providers ─────────────────────────
 @router.get("/providers", response_model=list[ProviderOut])
 def list_providers(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
@@ -337,6 +444,23 @@ def create_provider(payload: ProviderCreate, ctx: AuthContext = Depends(require_
     db.commit()
     db.refresh(row)
     return row
+
+
+@router.get("/providers/{provider_id}/schedules")
+def list_schedules(provider_id: str, ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+    rows = db.query(m.ProviderSchedule).filter(
+        m.ProviderSchedule.provider_id == provider_id,
+        m.ProviderSchedule.tenant_id == ctx.tenant_id,
+        m.ProviderSchedule.is_deleted == False,
+    ).all()
+    return [
+        {
+            "id": str(r.id), "day_of_week": r.day_of_week,
+            "start_time": r.start_time, "end_time": r.end_time,
+            "slot_minutes": r.slot_minutes, "mode": r.mode,
+        }
+        for r in rows
+    ]
 
 
 @router.post("/providers/{provider_id}/schedules")
@@ -422,6 +546,42 @@ def update_appointment_status(appointment_id: str, status: str = Query(...), ctx
                 correlation_id=ctx.correlation_id)
     db.commit()
     return {"id": str(row.id), "status": row.status}
+
+
+@router.post("/queue/tokens")
+def create_queue_token(payload: QueueTokenCreate, ctx: AuthContext = Depends(require_permission("queue:*")), db: Session = Depends(get_db)):
+    row = db.query(m.Appointment).filter(
+        m.Appointment.id == payload.appointment_id, m.Appointment.tenant_id == ctx.tenant_id
+    ).first()
+    if not row:
+        raise HTTPException(404, "Appointment not found")
+    if not row.queue_token:
+        token_n = db.query(m.Appointment).filter(m.Appointment.tenant_id == ctx.tenant_id).count() + 1
+        row.queue_token = f"T{token_n:04d}"
+        row.updated_by = ctx.user.id
+    write_audit(db, tenant_id=ctx.tenant_id, actor_user_id=ctx.user.id, action="CREATE",
+                entity_type="queue_token", entity_id=str(row.id),
+                new_values={"queue_token": row.queue_token}, correlation_id=ctx.correlation_id)
+    db.commit()
+    return {"appointment_id": str(row.id), "queue_token": row.queue_token, "status": row.status}
+
+
+@router.patch("/queue/tokens/{appointment_id}/status")
+def update_queue_status(appointment_id: str, status: str = Query(...), ctx: AuthContext = Depends(require_permission("queue:*")), db: Session = Depends(get_db)):
+    row = db.query(m.Appointment).filter(
+        m.Appointment.id == appointment_id, m.Appointment.tenant_id == ctx.tenant_id
+    ).first()
+    if not row:
+        raise HTTPException(404, "Queue token not found")
+    old = row.status
+    row.status = status
+    row.updated_by = ctx.user.id
+    write_audit(db, tenant_id=ctx.tenant_id, actor_user_id=ctx.user.id, action="STATUS_CHANGE",
+                entity_type="queue_token", entity_id=str(row.id),
+                old_values={"status": old}, new_values={"status": status},
+                correlation_id=ctx.correlation_id)
+    db.commit()
+    return {"id": str(row.id), "queue_token": row.queue_token, "status": row.status}
 
 
 # ───────────────────────── Encounters / OPD ─────────────────────────
@@ -553,6 +713,38 @@ def close_encounter(encounter_id: str, assessment: str = "", plan: str = "", ctx
 
 
 # ───────────────────────── Telemedicine ─────────────────────────
+@router.post("/telemedicine/sessions")
+def create_tele_session(payload: TeleSessionCreate, ctx: AuthContext = Depends(require_permission("telemedicine:*")), db: Session = Depends(get_db)):
+    appt = db.query(m.Appointment).filter(
+        m.Appointment.id == payload.appointment_id, m.Appointment.tenant_id == ctx.tenant_id
+    ).first()
+    if not appt:
+        raise HTTPException(404, "Appointment not found")
+    existing = db.query(m.TelemedicineSession).filter(
+        m.TelemedicineSession.appointment_id == appt.id, m.TelemedicineSession.is_deleted == False
+    ).first()
+    if existing:
+        return {"id": str(existing.id), "room_id": existing.room_id, "status": existing.status}
+    cfg = db.query(m.TenantVideoConfig).filter(m.TenantVideoConfig.tenant_id == ctx.tenant_id).first()
+    provider_code = cfg.provider_code if cfg else "twilio"
+    room = f"room-{ctx.tenant_code}-{appt.id.hex[:8]}"
+    row = m.TelemedicineSession(
+        tenant_id=ctx.tenant_id, appointment_id=appt.id,
+        patient_id=appt.patient_id, provider_id=appt.provider_id,
+        provider_code=provider_code, room_id=room, status="waiting",
+        join_token_patient=f"pt-{uuid4().hex}",
+        join_token_provider=f"dr-{uuid4().hex}",
+        created_by=ctx.user.id, updated_by=ctx.user.id,
+    )
+    db.add(row)
+    write_audit(db, tenant_id=ctx.tenant_id, actor_user_id=ctx.user.id, action="CREATE",
+                entity_type="telemedicine_session", entity_id=str(row.id),
+                correlation_id=ctx.correlation_id)
+    db.commit()
+    db.refresh(row)
+    return {"id": str(row.id), "room_id": row.room_id, "status": row.status}
+
+
 @router.get("/telemedicine/sessions")
 def list_tele_sessions(ctx: AuthContext = Depends(require_permission("telemedicine:*")), db: Session = Depends(get_db)):
     rows = db.query(m.TelemedicineSession).filter(
@@ -590,6 +782,58 @@ def join_tele_session(session_id: str, as_role: str = Query("patient"), ctx: Aut
         "provider": row.provider_code,
         "status": row.status,
         "recording_allowed": bool(row.recording_consent_id),
+    }
+
+
+@router.post("/telemedicine/waiting-room")
+def waiting_room(payload: WaitingRoomAction, ctx: AuthContext = Depends(require_permission("telemedicine:*")), db: Session = Depends(get_db)):
+    row = db.query(m.TelemedicineSession).filter(
+        m.TelemedicineSession.id == payload.session_id, m.TelemedicineSession.tenant_id == ctx.tenant_id
+    ).first()
+    if not row:
+        raise HTTPException(404, "Session not found")
+    if payload.action == "admit":
+        row.status = "in_progress"
+        row.started_at = datetime.now(timezone.utc)
+    else:
+        row.status = "waiting"
+    row.updated_by = ctx.user.id
+    db.commit()
+    return {"session_id": str(row.id), "status": row.status}
+
+
+@router.post("/telemedicine/in-call/notes")
+def in_call_note(payload: InCallNoteCreate, ctx: AuthContext = Depends(require_permission("telemedicine:*")), db: Session = Depends(get_db)):
+    row = db.query(m.TelemedicineSession).filter(
+        m.TelemedicineSession.id == payload.session_id, m.TelemedicineSession.tenant_id == ctx.tenant_id
+    ).first()
+    if not row:
+        raise HTTPException(404, "Session not found")
+    note_line = f"[{payload.note_type}] {payload.content}"
+    row.post_call_summary = (row.post_call_summary or "") + ("\n" if row.post_call_summary else "") + note_line
+    row.updated_by = ctx.user.id
+    write_audit(db, tenant_id=ctx.tenant_id, actor_user_id=ctx.user.id, action="CREATE",
+                entity_type="telemedicine_session", entity_id=str(row.id),
+                new_values={"in_call_note": payload.content}, correlation_id=ctx.correlation_id)
+    db.commit()
+    return {"session_id": str(row.id), "note": payload.content}
+
+
+@router.get("/telemedicine/recordings/{session_id}")
+def get_recording(session_id: str, ctx: AuthContext = Depends(require_permission("telemedicine:*")), db: Session = Depends(get_db)):
+    row = db.query(m.TelemedicineSession).filter(
+        m.TelemedicineSession.id == session_id, m.TelemedicineSession.tenant_id == ctx.tenant_id
+    ).first()
+    if not row:
+        raise HTTPException(404, "Session not found")
+    if not row.recording_consent_id:
+        raise HTTPException(400, "Recording consent required")
+    return {
+        "session_id": str(row.id),
+        "recording_id": f"rec-{row.id.hex[:12]}",
+        "status": "stored",
+        "storage_key": f"tenant/{ctx.tenant_code}/recordings/{row.id}.mp4",
+        "retention_days": 90,
     }
 
 
@@ -680,6 +924,43 @@ def create_location_event(payload: LocationEventCreate, ctx: AuthContext = Depen
 
 
 # ───────────────────────── Billing stubs ─────────────────────────
+@router.post("/billing/estimates")
+def create_estimate(payload: InvoiceCreate, ctx: AuthContext = Depends(require_permission("billing:*")), db: Session = Depends(get_db)):
+    count = db.query(m.Invoice).filter(m.Invoice.tenant_id == ctx.tenant_id).count() + 1
+    est_no = f"EST-{ctx.tenant_code.upper()}-{count:06d}"
+    subtotal = 0.0
+    inv = m.Invoice(
+        tenant_id=ctx.tenant_id, patient_id=payload.patient_id,
+        encounter_id=payload.encounter_id, invoice_no=est_no, status="estimate",
+        created_by=ctx.user.id, updated_by=ctx.user.id,
+    )
+    db.add(inv)
+    db.flush()
+    for line in payload.lines:
+        tariff = db.query(m.Tariff).filter(
+            m.Tariff.tenant_id == ctx.tenant_id, m.Tariff.code == line.get("tariff_code")
+        ).first()
+        if not tariff:
+            raise HTTPException(400, f"Unknown tariff {line.get('tariff_code')}")
+        qty = float(line.get("qty", 1))
+        amount = float(tariff.amount) * qty
+        subtotal += amount
+        db.add(m.InvoiceLine(
+            tenant_id=ctx.tenant_id, invoice_id=inv.id,
+            tariff_code=tariff.code, description=tariff.name,
+            qty=qty, unit_price=tariff.amount, amount=amount,
+            created_by=ctx.user.id, updated_by=ctx.user.id,
+        ))
+    inv.subtotal = subtotal
+    inv.total = subtotal
+    write_audit(db, tenant_id=ctx.tenant_id, actor_user_id=ctx.user.id, action="CREATE",
+                entity_type="billing_estimate", entity_id=str(inv.id),
+                new_values={"estimate_no": est_no, "total": subtotal},
+                correlation_id=ctx.correlation_id)
+    db.commit()
+    return {"id": str(inv.id), "estimate_no": est_no, "total": subtotal, "status": "estimate"}
+
+
 @router.post("/billing/invoices")
 def create_invoice(payload: InvoiceCreate, ctx: AuthContext = Depends(require_permission("billing:*")), db: Session = Depends(get_db)):
     count = db.query(m.Invoice).filter(m.Invoice.tenant_id == ctx.tenant_id).count() + 1
@@ -785,6 +1066,43 @@ def api_audit_logs(ctx: AuthContext = Depends(require_permission("audit:read")),
     ]
 
 
+@router.get("/audit/clinical-access")
+def clinical_access_logs(ctx: AuthContext = Depends(require_permission("audit:read")), db: Session = Depends(get_db), limit: int = 100):
+    clinical_types = ("patient", "encounter", "prescription", "telemedicine_session", "clinical_note")
+    clinical_actions = ("VIEW", "CREATE", "UPDATE", "JOIN", "STATUS_CHANGE")
+    q = db.query(m.AuditLog).filter(
+        m.AuditLog.entity_type.in_(clinical_types),
+        m.AuditLog.action.in_(clinical_actions),
+    ).order_by(m.AuditLog.created_at.desc())
+    if ctx.tenant_id and not ctx.user.is_super_admin:
+        q = q.filter(m.AuditLog.tenant_id == ctx.tenant_id)
+    rows = q.limit(limit).all()
+    return [
+        {
+            "id": str(r.id), "action": r.action, "entity_type": r.entity_type,
+            "entity_id": r.entity_id, "actor_user_id": str(r.actor_user_id) if r.actor_user_id else None,
+            "created_at": r.created_at,
+        }
+        for r in rows
+    ]
+
+
+# ───────────────────────── Notifications ─────────────────────────
+@router.post("/notifications/outbox")
+def queue_notification(payload: NotificationOutboxCreate, ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+    row = m.NotificationOutbox(
+        tenant_id=ctx.tenant_id, channel=payload.channel,
+        recipient=payload.recipient, subject=payload.subject, body=payload.body,
+        created_by=ctx.user.id, updated_by=ctx.user.id,
+    )
+    db.add(row)
+    write_audit(db, tenant_id=ctx.tenant_id, actor_user_id=ctx.user.id, action="CREATE",
+                entity_type="notification", new_values={"channel": payload.channel, "recipient": payload.recipient},
+                correlation_id=ctx.correlation_id)
+    db.commit()
+    return {"id": str(row.id), "status": "pending"}
+
+
 # ───────────────────────── Dashboard KPIs ─────────────────────────
 @router.get("/dashboard/summary")
 def dashboard_summary(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
@@ -793,12 +1111,23 @@ def dashboard_summary(ctx: AuthContext = Depends(require_tenant), db: Session = 
     open_enc = db.query(m.Encounter).filter(m.Encounter.tenant_id == ctx.tenant_id, m.Encounter.status == "open").count()
     tele = db.query(m.TelemedicineSession).filter(m.TelemedicineSession.tenant_id == ctx.tenant_id).count()
     invoices = db.query(m.Invoice).filter(m.Invoice.tenant_id == ctx.tenant_id).count()
+    ipd = db.query(m.IpdAdmission).filter(m.IpdAdmission.tenant_id == ctx.tenant_id).count()
+    lab = db.query(m.LabOrder).filter(m.LabOrder.tenant_id == ctx.tenant_id).count()
+    claims = db.query(m.InsuranceClaim).filter(m.InsuranceClaim.tenant_id == ctx.tenant_id).count()
+    beds_avail = db.query(m.Bed).filter(m.Bed.tenant_id == ctx.tenant_id, m.Bed.status == "available").count()
+    modules_active = db.query(m.PlatformModule).filter(m.PlatformModule.active == True).count()
     return {
         "kpis": [
             {"code": "patients", "label": "Patients", "value": patients, "drilldown": "/patients"},
             {"code": "appointments", "label": "Appointments", "value": appts, "drilldown": "/appointments"},
+            {"code": "checked_in", "label": "Checked In", "value": db.query(m.Appointment).filter(m.Appointment.tenant_id == ctx.tenant_id, m.Appointment.status == "checked_in").count(), "drilldown": "/appointments?status=checked_in"},
             {"code": "open_encounters", "label": "Open Encounters", "value": open_enc, "drilldown": "/encounters"},
             {"code": "telemedicine", "label": "Tele Sessions", "value": tele, "drilldown": "/telemedicine"},
+            {"code": "ipd", "label": "IPD Admissions", "value": ipd, "drilldown": "/clinical-hub"},
+            {"code": "lab", "label": "Lab Orders", "value": lab, "drilldown": "/clinical-hub"},
+            {"code": "claims", "label": "Insurance Claims", "value": claims, "drilldown": "/clinical-hub"},
+            {"code": "beds", "label": "Beds Available", "value": beds_avail, "drilldown": "/administration"},
             {"code": "invoices", "label": "Invoices", "value": invoices, "drilldown": "/billing"},
+            {"code": "modules", "label": "Platform Modules", "value": modules_active, "drilldown": "/reports"},
         ]
     }

@@ -14,7 +14,9 @@ const RESOURCES = [
   "consent-templates",
   "video-providers",
   "location-purposes",
-  "ui-actions",
+  "insurance-payers",
+  "room-categories",
+  "beds",
 ];
 
 export default function MastersPage() {

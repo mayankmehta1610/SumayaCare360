@@ -19,6 +19,59 @@ class LoginRequest(BaseModel):
     tenant_code: Optional[str] = None
 
 
+class RefreshRequest(BaseModel):
+    access_token: str
+
+
+class DepartmentCreate(BaseModel):
+    code: str
+    name: str
+    branch_id: Optional[UUID] = None
+
+
+class DepartmentOut(BaseModel):
+    id: UUID
+    code: str
+    name: str
+    branch_id: Optional[UUID]
+    status: str
+
+    class Config:
+        from_attributes = True
+
+
+class PatientUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    gender_code: Optional[str] = None
+    address: Optional[str] = None
+    status: Optional[str] = None
+
+
+class QueueTokenCreate(BaseModel):
+    appointment_id: UUID
+
+
+class WaitingRoomAction(BaseModel):
+    session_id: UUID
+    action: str = Field(pattern="^(admit|hold)$")
+
+
+class InCallNoteCreate(BaseModel):
+    session_id: UUID
+    content: str
+    note_type: str = "progress"
+
+
+class NotificationOutboxCreate(BaseModel):
+    channel: str = "email"
+    recipient: str
+    subject: str = ""
+    body: str
+
+
 class TenantCreate(BaseModel):
     tenant_code: str = Field(min_length=2, max_length=50)
     name: str

@@ -4,7 +4,7 @@ from sqlalchemy import (
     Boolean, Column, DateTime, ForeignKey, Integer, Numeric,
     String, Text, UniqueConstraint, JSON, Index
 )
-from sqlalchemy.dialects.postgresql import UUID
+from app.db.types import GUID
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 
@@ -14,11 +14,11 @@ def utcnow():
 
 
 class AuditedMixin:
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
-    created_by = Column(UUID(as_uuid=True), nullable=True)
-    updated_by = Column(UUID(as_uuid=True), nullable=True)
+    created_by = Column(GUID(), nullable=True)
+    updated_by = Column(GUID(), nullable=True)
     is_deleted = Column(Boolean, default=False, nullable=False)
     row_version = Column(Integer, default=1, nullable=False)
     correlation_id = Column(String(64), nullable=True)
@@ -37,7 +37,7 @@ class Tenant(Base, AuditedMixin):
 
 class Branch(Base, AuditedMixin):
     __tablename__ = "branches"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     code = Column(String(50), nullable=False)
     name = Column(String(255), nullable=False)
     address = Column(Text)
@@ -48,8 +48,8 @@ class Branch(Base, AuditedMixin):
 
 class Department(Base, AuditedMixin):
     __tablename__ = "departments"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"), nullable=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
     code = Column(String(50), nullable=False)
     name = Column(String(255), nullable=False)
     status = Column(String(32), default="active")
@@ -57,7 +57,7 @@ class Department(Base, AuditedMixin):
 
 class Role(Base, AuditedMixin):
     __tablename__ = "roles"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=True, index=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=True, index=True)
     code = Column(String(64), nullable=False)
     name = Column(String(128), nullable=False)
     permissions = Column(JSON, default=list)
@@ -67,8 +67,8 @@ class Role(Base, AuditedMixin):
 
 class User(Base, AuditedMixin):
     __tablename__ = "users"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=True, index=True)
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"), nullable=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=True, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
     email = Column(String(255), nullable=False, index=True)
     full_name = Column(String(255), nullable=False)
     hashed_password = Column(String(255), nullable=False)
@@ -96,7 +96,7 @@ class Gender(Base, AuditedMixin):
 
 class Specialty(Base, AuditedMixin):
     __tablename__ = "specialties"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=True, index=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=True, index=True)
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     status = Column(String(32), default="active")
@@ -104,7 +104,7 @@ class Specialty(Base, AuditedMixin):
 
 class Disease(Base, AuditedMixin):
     __tablename__ = "diseases"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=True, index=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=True, index=True)
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     icd_code = Column(String(32))
@@ -113,7 +113,7 @@ class Disease(Base, AuditedMixin):
 
 class Medicine(Base, AuditedMixin):
     __tablename__ = "medicines"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     form = Column(String(64))
@@ -123,7 +123,7 @@ class Medicine(Base, AuditedMixin):
 
 class LabTest(Base, AuditedMixin):
     __tablename__ = "lab_tests"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     sample_type = Column(String(64))
@@ -132,8 +132,8 @@ class LabTest(Base, AuditedMixin):
 
 class Tariff(Base, AuditedMixin):
     __tablename__ = "tariffs"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"), nullable=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     category = Column(String(64), nullable=False)
@@ -144,7 +144,7 @@ class Tariff(Base, AuditedMixin):
 
 class ClinicalTemplate(Base, AuditedMixin):
     __tablename__ = "clinical_templates"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     template_type = Column(String(64), nullable=False)
@@ -154,7 +154,7 @@ class ClinicalTemplate(Base, AuditedMixin):
 
 class NotificationTemplate(Base, AuditedMixin):
     __tablename__ = "notification_templates"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     code = Column(String(64), nullable=False)
     channel = Column(String(32), nullable=False)
     subject = Column(String(255))
@@ -164,7 +164,7 @@ class NotificationTemplate(Base, AuditedMixin):
 
 class ConsentTemplate(Base, AuditedMixin):
     __tablename__ = "consent_templates"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=True, index=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=True, index=True)
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     purpose = Column(String(128), nullable=False)
@@ -183,7 +183,7 @@ class VideoProvider(Base, AuditedMixin):
 
 class TenantVideoConfig(Base, AuditedMixin):
     __tablename__ = "tenant_video_configs"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, unique=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, unique=True)
     provider_code = Column(String(64), nullable=False)
     config = Column(JSON, default=dict)
     recording_enabled = Column(Boolean, default=False)
@@ -192,7 +192,7 @@ class TenantVideoConfig(Base, AuditedMixin):
 
 class LocationPurpose(Base, AuditedMixin):
     __tablename__ = "location_purposes"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=True)
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     requires_consent = Column(Boolean, default=True)
@@ -211,8 +211,8 @@ class UIActionRegistry(Base, AuditedMixin):
 
 class Patient(Base, AuditedMixin):
     __tablename__ = "patients"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"), nullable=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
     mrn = Column(String(64), nullable=False)
     first_name = Column(String(128), nullable=False)
     last_name = Column(String(128), nullable=False)
@@ -233,9 +233,9 @@ class Patient(Base, AuditedMixin):
 
 class Provider(Base, AuditedMixin):
     __tablename__ = "providers"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"), nullable=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
+    user_id = Column(GUID(), ForeignKey("users.id"), nullable=True)
     code = Column(String(64), nullable=False)
     full_name = Column(String(255), nullable=False)
     specialty_code = Column(String(64))
@@ -246,8 +246,8 @@ class Provider(Base, AuditedMixin):
 
 class ProviderSchedule(Base, AuditedMixin):
     __tablename__ = "provider_schedules"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    provider_id = Column(UUID(as_uuid=True), ForeignKey("providers.id"), nullable=False)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    provider_id = Column(GUID(), ForeignKey("providers.id"), nullable=False)
     day_of_week = Column(Integer, nullable=False)
     start_time = Column(String(8), nullable=False)
     end_time = Column(String(8), nullable=False)
@@ -257,10 +257,10 @@ class ProviderSchedule(Base, AuditedMixin):
 
 class Appointment(Base, AuditedMixin):
     __tablename__ = "appointments"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"), nullable=True)
-    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
-    provider_id = Column(UUID(as_uuid=True), ForeignKey("providers.id"), nullable=False)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    provider_id = Column(GUID(), ForeignKey("providers.id"), nullable=False)
     scheduled_at = Column(DateTime(timezone=True), nullable=False)
     mode = Column(String(32), default="in_person")
     status = Column(String(32), default="scheduled")
@@ -271,11 +271,11 @@ class Appointment(Base, AuditedMixin):
 
 class Encounter(Base, AuditedMixin):
     __tablename__ = "encounters"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"), nullable=True)
-    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
-    provider_id = Column(UUID(as_uuid=True), ForeignKey("providers.id"), nullable=False)
-    appointment_id = Column(UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    provider_id = Column(GUID(), ForeignKey("providers.id"), nullable=False)
+    appointment_id = Column(GUID(), ForeignKey("appointments.id"), nullable=True)
     encounter_type = Column(String(32), default="opd")
     status = Column(String(32), default="open")
     chief_complaint = Column(Text)
@@ -287,9 +287,9 @@ class Encounter(Base, AuditedMixin):
 
 class Vital(Base, AuditedMixin):
     __tablename__ = "vitals"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    encounter_id = Column(UUID(as_uuid=True), ForeignKey("encounters.id"), nullable=False)
-    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    encounter_id = Column(GUID(), ForeignKey("encounters.id"), nullable=False)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
     bp_systolic = Column(Integer)
     bp_diastolic = Column(Integer)
     pulse = Column(Integer)
@@ -302,8 +302,8 @@ class Vital(Base, AuditedMixin):
 
 class ClinicalNote(Base, AuditedMixin):
     __tablename__ = "clinical_notes"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    encounter_id = Column(UUID(as_uuid=True), ForeignKey("encounters.id"), nullable=False)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    encounter_id = Column(GUID(), ForeignKey("encounters.id"), nullable=False)
     note_type = Column(String(64), default="progress")
     content = Column(Text, nullable=False)
     template_code = Column(String(64))
@@ -311,8 +311,8 @@ class ClinicalNote(Base, AuditedMixin):
 
 class EncounterDiagnosis(Base, AuditedMixin):
     __tablename__ = "encounter_diagnoses"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    encounter_id = Column(UUID(as_uuid=True), ForeignKey("encounters.id"), nullable=False)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    encounter_id = Column(GUID(), ForeignKey("encounters.id"), nullable=False)
     disease_code = Column(String(64), nullable=False)
     disease_name = Column(String(255), nullable=False)
     is_primary = Column(Boolean, default=True)
@@ -320,18 +320,18 @@ class EncounterDiagnosis(Base, AuditedMixin):
 
 class Prescription(Base, AuditedMixin):
     __tablename__ = "prescriptions"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    encounter_id = Column(UUID(as_uuid=True), ForeignKey("encounters.id"), nullable=False)
-    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
-    provider_id = Column(UUID(as_uuid=True), ForeignKey("providers.id"), nullable=False)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    encounter_id = Column(GUID(), ForeignKey("encounters.id"), nullable=False)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    provider_id = Column(GUID(), ForeignKey("providers.id"), nullable=False)
     status = Column(String(32), default="draft")
     notes = Column(Text)
 
 
 class PrescriptionLine(Base, AuditedMixin):
     __tablename__ = "prescription_lines"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    prescription_id = Column(UUID(as_uuid=True), ForeignKey("prescriptions.id"), nullable=False)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    prescription_id = Column(GUID(), ForeignKey("prescriptions.id"), nullable=False)
     medicine_code = Column(String(64), nullable=False)
     medicine_name = Column(String(255), nullable=False)
     dose = Column(String(64))
@@ -342,16 +342,16 @@ class PrescriptionLine(Base, AuditedMixin):
 
 class TelemedicineSession(Base, AuditedMixin):
     __tablename__ = "telemedicine_sessions"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    appointment_id = Column(UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=False)
-    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
-    provider_id = Column(UUID(as_uuid=True), ForeignKey("providers.id"), nullable=False)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    appointment_id = Column(GUID(), ForeignKey("appointments.id"), nullable=False)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    provider_id = Column(GUID(), ForeignKey("providers.id"), nullable=False)
     provider_code = Column(String(64), default="twilio")
     room_id = Column(String(128), nullable=False)
     status = Column(String(32), default="waiting")
     join_token_patient = Column(String(512))
     join_token_provider = Column(String(512))
-    recording_consent_id = Column(UUID(as_uuid=True), nullable=True)
+    recording_consent_id = Column(GUID(), nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=True)
     ended_at = Column(DateTime(timezone=True), nullable=True)
     post_call_summary = Column(Text)
@@ -359,8 +359,8 @@ class TelemedicineSession(Base, AuditedMixin):
 
 class ConsentCapture(Base, AuditedMixin):
     __tablename__ = "consent_captures"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
     template_code = Column(String(64), nullable=False)
     purpose = Column(String(128), nullable=False)
     version = Column(String(32), nullable=False)
@@ -371,10 +371,10 @@ class ConsentCapture(Base, AuditedMixin):
 
 class LocationEvent(Base, AuditedMixin):
     __tablename__ = "location_events"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=True)
     purpose_code = Column(String(64), nullable=False)
-    consent_id = Column(UUID(as_uuid=True), ForeignKey("consent_captures.id"), nullable=True)
+    consent_id = Column(GUID(), ForeignKey("consent_captures.id"), nullable=True)
     latitude = Column(Numeric(10, 7))
     longitude = Column(Numeric(10, 7))
     accuracy_m = Column(Numeric(10, 2))
@@ -383,10 +383,10 @@ class LocationEvent(Base, AuditedMixin):
 
 class Invoice(Base, AuditedMixin):
     __tablename__ = "invoices"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    branch_id = Column(UUID(as_uuid=True), ForeignKey("branches.id"), nullable=True)
-    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
-    encounter_id = Column(UUID(as_uuid=True), ForeignKey("encounters.id"), nullable=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    encounter_id = Column(GUID(), ForeignKey("encounters.id"), nullable=True)
     invoice_no = Column(String(64), nullable=False)
     status = Column(String(32), default="draft")
     subtotal = Column(Numeric(12, 2), default=0)
@@ -398,8 +398,8 @@ class Invoice(Base, AuditedMixin):
 
 class InvoiceLine(Base, AuditedMixin):
     __tablename__ = "invoice_lines"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    invoice_id = Column(UUID(as_uuid=True), ForeignKey("invoices.id"), nullable=False)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    invoice_id = Column(GUID(), ForeignKey("invoices.id"), nullable=False)
     tariff_code = Column(String(64), nullable=False)
     description = Column(String(255), nullable=False)
     qty = Column(Numeric(10, 2), default=1)
@@ -409,8 +409,8 @@ class InvoiceLine(Base, AuditedMixin):
 
 class Payment(Base, AuditedMixin):
     __tablename__ = "payments"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
-    invoice_id = Column(UUID(as_uuid=True), ForeignKey("invoices.id"), nullable=False)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    invoice_id = Column(GUID(), ForeignKey("invoices.id"), nullable=False)
     amount = Column(Numeric(12, 2), nullable=False)
     currency = Column(String(8), default="INR")
     gateway = Column(String(64), default="stub")
@@ -422,8 +422,8 @@ class Payment(Base, AuditedMixin):
 
 class AuditLog(Base, AuditedMixin):
     __tablename__ = "audit_logs"
-    tenant_id = Column(UUID(as_uuid=True), nullable=True, index=True)
-    actor_user_id = Column(UUID(as_uuid=True), nullable=True)
+    tenant_id = Column(GUID(), nullable=True, index=True)
+    actor_user_id = Column(GUID(), nullable=True)
     action = Column(String(64), nullable=False)
     entity_type = Column(String(128), nullable=False)
     entity_id = Column(String(64), nullable=True)
@@ -436,8 +436,8 @@ class AuditLog(Base, AuditedMixin):
 
 class ApiAuditLog(Base, AuditedMixin):
     __tablename__ = "api_audit_logs"
-    tenant_id = Column(UUID(as_uuid=True), nullable=True, index=True)
-    actor_user_id = Column(UUID(as_uuid=True), nullable=True)
+    tenant_id = Column(GUID(), nullable=True, index=True)
+    actor_user_id = Column(GUID(), nullable=True)
     method = Column(String(16), nullable=False)
     path = Column(String(512), nullable=False)
     status_code = Column(Integer)
@@ -449,10 +449,174 @@ class ApiAuditLog(Base, AuditedMixin):
 
 class NotificationOutbox(Base, AuditedMixin):
     __tablename__ = "notification_outbox"
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     channel = Column(String(32), nullable=False)
     recipient = Column(String(255), nullable=False)
     subject = Column(String(255))
     body = Column(Text, nullable=False)
     status = Column(String(32), default="pending")
     sent_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class PlatformModule(Base, AuditedMixin):
+    __tablename__ = "platform_modules"
+    code = Column(String(128), unique=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    category = Column(String(64), nullable=False)
+    route = Column(String(255), nullable=False)
+    api_slug = Column(String(128), nullable=False)
+    submodules = Column(JSON, default=list)
+    fields_schema = Column(JSON, default=list)
+    statuses = Column(JSON, default=list)
+    is_dedicated = Column(Boolean, default=False)
+    active = Column(Boolean, default=True)
+
+
+class ModuleRecord(Base, AuditedMixin):
+    __tablename__ = "module_records"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
+    module_code = Column(String(128), nullable=False, index=True)
+    submodule = Column(String(128), nullable=False)
+    reference_no = Column(String(64), nullable=False)
+    title = Column(String(255), nullable=False)
+    status = Column(String(32), default="draft")
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=True)
+    provider_id = Column(GUID(), ForeignKey("providers.id"), nullable=True)
+    payload = Column(JSON, default=dict)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "module_code", "reference_no", name="uq_module_record_ref"),
+        Index("ix_module_record_search", "tenant_id", "module_code", "status"),
+    )
+
+
+class RoomCategory(Base, AuditedMixin):
+    __tablename__ = "room_categories"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
+    code = Column(String(64), nullable=False)
+    name = Column(String(255), nullable=False)
+    tariff_class = Column(String(64))
+    nursing_station = Column(String(128))
+    status = Column(String(32), default="active")
+
+
+class Bed(Base, AuditedMixin):
+    __tablename__ = "beds"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
+    room_code = Column(String(64), nullable=False)
+    bed_code = Column(String(64), nullable=False)
+    category_code = Column(String(64))
+    status = Column(String(32), default="available")
+    isolation_flag = Column(Boolean, default=False)
+    equipment_tags = Column(JSON, default=list)
+
+
+class InsurancePayer(Base, AuditedMixin):
+    __tablename__ = "insurance_payers"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    code = Column(String(64), nullable=False)
+    name = Column(String(255), nullable=False)
+    tpa_name = Column(String(255))
+    api_endpoint = Column(String(512))
+    claim_rules = Column(JSON, default=dict)
+    status = Column(String(32), default="active")
+
+
+class InsuranceClaim(Base, AuditedMixin):
+    __tablename__ = "insurance_claims"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    payer_code = Column(String(64), nullable=False)
+    claim_no = Column(String(64), nullable=False)
+    status = Column(String(32), default="draft")
+    amount = Column(Numeric(12, 2), default=0)
+    pre_auth_no = Column(String(128))
+    policy_no = Column(String(128))
+    notes = Column(Text)
+
+
+class LabOrder(Base, AuditedMixin):
+    __tablename__ = "lab_orders"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    provider_id = Column(GUID(), ForeignKey("providers.id"), nullable=True)
+    encounter_id = Column(GUID(), ForeignKey("encounters.id"), nullable=True)
+    order_no = Column(String(64), nullable=False)
+    test_code = Column(String(64), nullable=False)
+    status = Column(String(32), default="ordered")
+    result_value = Column(String(255))
+    result_notes = Column(Text)
+    critical_flag = Column(Boolean, default=False)
+
+
+class RadiologyOrder(Base, AuditedMixin):
+    __tablename__ = "radiology_orders"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    provider_id = Column(GUID(), ForeignKey("providers.id"), nullable=True)
+    order_no = Column(String(64), nullable=False)
+    study_code = Column(String(64), nullable=False)
+    status = Column(String(32), default="ordered")
+    report_text = Column(Text)
+    pacs_link = Column(String(512))
+
+
+class PharmacyDispense(Base, AuditedMixin):
+    __tablename__ = "pharmacy_dispenses"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    prescription_id = Column(GUID(), ForeignKey("prescriptions.id"), nullable=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    dispense_no = Column(String(64), nullable=False)
+    medicine_code = Column(String(64), nullable=False)
+    qty = Column(Numeric(10, 2), default=1)
+    status = Column(String(32), default="pending")
+    substitution_code = Column(String(64))
+
+
+class IpdAdmission(Base, AuditedMixin):
+    __tablename__ = "ipd_admissions"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    admission_no = Column(String(64), nullable=False)
+    bed_code = Column(String(64))
+    ward_code = Column(String(64))
+    status = Column(String(32), default="admitted")
+    admitted_at = Column(DateTime(timezone=True), default=utcnow)
+    discharged_at = Column(DateTime(timezone=True), nullable=True)
+    diagnosis_code = Column(String(64))
+
+
+class WorkflowDefinition(Base, AuditedMixin):
+    __tablename__ = "workflow_definitions"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=True, index=True)
+    workflow_code = Column(String(64), nullable=False)
+    name = Column(String(255), nullable=False)
+    module_code = Column(String(128))
+    steps = Column(JSON, default=list)
+    transitions = Column(JSON, default=list)
+    status = Column(String(32), default="active")
+
+
+class ReportDefinition(Base, AuditedMixin):
+    __tablename__ = "report_definitions"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=True, index=True)
+    code = Column(String(64), nullable=False)
+    name = Column(String(255), nullable=False)
+    audience = Column(String(128))
+    filters = Column(JSON, default=list)
+    metrics = Column(JSON, default=list)
+    module_code = Column(String(128))
+    status = Column(String(32), default="active")
+
+
+class KpiDefinition(Base, AuditedMixin):
+    __tablename__ = "kpi_definitions"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=True, index=True)
+    code = Column(String(64), nullable=False)
+    label = Column(String(255), nullable=False)
+    module_code = Column(String(128))
+    drilldown_route = Column(String(255))
+    query_hint = Column(String(255))
+    status = Column(String(32), default="active")

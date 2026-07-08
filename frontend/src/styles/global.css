@@ -70,18 +70,15 @@ label {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 260px 1fr;
   min-height: 100vh;
 }
-@media (max-width: 900px) {
-  .app-shell { grid-template-columns: 1fr; }
-  .sidebar { position: sticky; top: 0; z-index: 5; }
-}
-
 .sidebar {
   background: linear-gradient(180deg, #0b6e4f 0%, #084c37 100%);
   color: #f4fffa;
-  padding: 1.25rem 1rem;
+  padding: 1.25rem 0.75rem;
+  overflow-y: auto;
+  max-height: 100vh;
 }
 .brand {
   font-family: var(--display);
@@ -104,6 +101,14 @@ label {
 .nav a.active, .nav a:hover {
   background: rgba(255,255,255,0.14);
   opacity: 1;
+}
+.nav-group { margin-bottom: 0.9rem; }
+.nav-cat {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.65;
+  margin: 0.35rem 0.5rem;
 }
 
 .main { padding: 1.25rem 1.5rem 2rem; }

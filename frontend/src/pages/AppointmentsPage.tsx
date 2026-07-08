@@ -1,7 +1,10 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 
 export default function AppointmentsPage() {
+  const [searchParams] = useSearchParams();
+  const statusFilter = searchParams.get("status") || "";
   const [rows, setRows] = useState<any[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
   const [providers, setProviders] = useState<any[]>([]);
@@ -30,6 +33,11 @@ export default function AppointmentsPage() {
     load().catch((e) => setError(e.message));
   }, []);
 
+  const filtered = useMemo(
+    () => (statusFilter ? rows.filter((r) => r.status === statusFilter) : rows),
+    [rows, statusFilter]
+  );
+
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     try {
@@ -48,13 +56,18 @@ export default function AppointmentsPage() {
   }
 
   async function setStatus(id: string, status: string) {
-    await api(`/appointments/${id}/status?status=${status}`, { method: "PATCH" });
-    await load();
+    try {
+      await api(`/appointments/${id}/status?status=${status}`, { method: "PATCH" });
+      await load();
+    } catch (err: any) {
+      setError(err.message);
+    }
   }
 
   return (
     <div>
       <h1 className="page-title">Appointments & queue</h1>
+      {statusFilter && <p className="muted">Filtered by status: <strong>{statusFilter}</strong></p>}
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
       <div className="grid-2">
@@ -97,7 +110,7 @@ export default function AppointmentsPage() {
               <tr><th>Token</th><th>When</th><th>Mode</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {filtered.map((r) => (
                 <tr key={r.id}>
                   <td>{r.queue_token}</td>
                   <td>{new Date(r.scheduled_at).toLocaleString()}</td>
@@ -106,6 +119,8 @@ export default function AppointmentsPage() {
                   <td className="actions">
                     <button type="button" className="secondary" onClick={() => setStatus(r.id, "checked_in")}>Check in</button>
                     <button type="button" className="secondary" onClick={() => setStatus(r.id, "completed")}>Complete</button>
+                    <button type="button" className="secondary" onClick={() => setStatus(r.id, "cancelled")}>Cancel</button>
+                    <button type="button" className="secondary" onClick={() => setStatus(r.id, "no_show")}>No show</button>
                   </td>
                 </tr>
               ))}

@@ -25,6 +25,14 @@ export function currentSession() {
   return getSession();
 }
 
+export function hasPermission(session: Session | null, perm: string): boolean {
+  if (!session) return false;
+  if (session.permissions.includes("*")) return true;
+  if (session.permissions.includes(perm)) return true;
+  const [resource] = perm.split(":");
+  return session.permissions.includes(`${resource}:*`);
+}
+
 export async function api<T = any>(
   path: string,
   options: RequestInit & { tenantCode?: string | null } = {}
@@ -47,6 +55,13 @@ export async function api<T = any>(
     ...options,
     headers,
   });
+  if (res.status === 401) {
+    clearSession();
+    if (!window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
+    throw new Error("Session expired");
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {

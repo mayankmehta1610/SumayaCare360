@@ -1,8 +1,9 @@
-import { createContext, useContext, useMemo, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { Session, clearSession, currentSession, saveSession, api } from "../api/client";
 
 type AuthState = {
   session: Session | null;
+  loading: boolean;
   login: (email: string, password: string, tenant_code?: string) => Promise<void>;
   logout: () => void;
 };
@@ -11,10 +12,37 @@ const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(currentSession());
+  const [loading, setLoading] = useState(!!currentSession());
+
+  useEffect(() => {
+    const existing = currentSession();
+    if (!existing) {
+      setLoading(false);
+      return;
+    }
+    api<Session>("/auth/me")
+      .then((me) => {
+        const next: Session = {
+          access_token: existing.access_token,
+          tenant_code: me.tenant_code ?? existing.tenant_code,
+          role_code: me.role_code,
+          full_name: me.full_name,
+          permissions: me.permissions ?? existing.permissions,
+        };
+        saveSession(next);
+        setSession(next);
+      })
+      .catch(() => {
+        clearSession();
+        setSession(null);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const value = useMemo<AuthState>(
     () => ({
       session,
+      loading,
       async login(email, password, tenant_code) {
         const data = await api<Session>("/auth/login", {
           method: "POST",
@@ -25,12 +53,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(data);
       },
       logout() {
+        api("/auth/logout", { method: "POST" }).catch(() => {});
         clearSession();
         setSession(null);
       },
     }),
-    [session]
+    [session, loading]
   );
+
+  if (loading) {
+    return <div className="card" style={{ margin: "2rem" }}>Loading session...</div>;
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
