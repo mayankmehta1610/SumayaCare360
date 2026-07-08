@@ -77,6 +77,17 @@ BUILD_SPEC.md
 SUMAYA_Care_360_Enterprise_Requirements_Audit_Telemedicine_Expanded.xlsx
 ```
 
+## Production (Render)
+
+| Service | URL |
+|--------|-----|
+| Web UI | https://sumayacare360-web.onrender.com |
+| API | https://sumayacare360-api.onrender.com |
+| API docs | https://sumayacare360-api.onrender.com/docs |
+| Health | https://sumayacare360-api.onrender.com/api/v1/health |
+
+Deploy from `main` via [Render Blueprint](render.yaml) or `.\scripts\deploy-render.ps1` (requires `RENDER_API_KEY`). Pushes to `main` auto-deploy when the Render GitHub integration is enabled.
+
 ## Quality rules enforced
 
 - No dummy clinical seed data beyond configuration templates + demo users/providers/tariffs
