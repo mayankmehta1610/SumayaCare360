@@ -32,7 +32,6 @@ services:
   - type: web
     name: sumayacare360-web
     runtime: static
-    plan: free
     buildCommand: cd frontend && npm install && VITE_API_BASE=https://sumayacare360-api.onrender.com/api/v1 npm run build
     staticPublishPath: ./frontend/dist
     routes:
