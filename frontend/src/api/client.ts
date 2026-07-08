@@ -45,7 +45,8 @@ export async function api<T = any>(
   if (session?.access_token) {
     headers.Authorization = `Bearer ${session.access_token}`;
   }
-  const tenant = options.tenantCode ?? session?.tenant_code;
+  const tenant = options.tenantCode ?? session?.tenant_code
+    ?? (session?.role_code === "SUPER_ADMIN" ? "demo" : undefined);
   if (tenant) {
     headers["X-Tenant-Code"] = tenant;
   }

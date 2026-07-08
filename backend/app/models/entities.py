@@ -120,6 +120,7 @@ class Medicine(Base, AuditedMixin):
     name = Column(String(255), nullable=False)
     form = Column(String(64))
     strength = Column(String(64))
+    stock_qty = Column(Numeric(12, 2), default=0)
     status = Column(String(32), default="active")
 
 
@@ -550,6 +551,7 @@ class LabOrder(Base, AuditedMixin):
     status = Column(String(32), default="ordered")
     result_value = Column(String(255))
     result_notes = Column(Text)
+    results = Column(JSON, default=dict)
     critical_flag = Column(Boolean, default=False)
 
 
@@ -558,23 +560,44 @@ class RadiologyOrder(Base, AuditedMixin):
     tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
     provider_id = Column(GUID(), ForeignKey("providers.id"), nullable=True)
+    encounter_id = Column(GUID(), ForeignKey("encounters.id"), nullable=True)
     order_no = Column(String(64), nullable=False)
     study_code = Column(String(64), nullable=False)
     status = Column(String(32), default="ordered")
     report_text = Column(Text)
     pacs_link = Column(String(512))
+    critical_flag = Column(Boolean, default=False)
+    scheduled_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class PharmacyDispense(Base, AuditedMixin):
     __tablename__ = "pharmacy_dispenses"
     tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     prescription_id = Column(GUID(), ForeignKey("prescriptions.id"), nullable=True)
+    prescription_line_id = Column(GUID(), ForeignKey("prescription_lines.id"), nullable=True)
+    encounter_id = Column(GUID(), ForeignKey("encounters.id"), nullable=True)
     patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
     dispense_no = Column(String(64), nullable=False)
     medicine_code = Column(String(64), nullable=False)
     qty = Column(Numeric(10, 2), default=1)
-    status = Column(String(32), default="pending")
+    status = Column(String(32), default="queued")
     substitution_code = Column(String(64))
+
+
+class NursingTask(Base, AuditedMixin):
+    __tablename__ = "nursing_tasks"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    admission_id = Column(GUID(), ForeignKey("ipd_admissions.id"), nullable=True)
+    task_type = Column(String(64), nullable=False)
+    description = Column(Text)
+    status = Column(String(32), default="pending")
+    due_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    assigned_to = Column(GUID(), ForeignKey("users.id"), nullable=True)
+    __table_args__ = (
+        Index("ix_nursing_task_search", "tenant_id", "admission_id", "status", "due_at"),
+    )
 
 
 class IpdAdmission(Base, AuditedMixin):
@@ -646,6 +669,39 @@ class PasswordResetToken(Base, AuditedMixin):
     token_hash = Column(String(128), nullable=False, unique=True)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     used = Column(Boolean, default=False, nullable=False)
+
+
+class CarePathwayTemplate(Base, AuditedMixin):
+    __tablename__ = "care_pathway_templates"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    code = Column(String(64), nullable=False)
+    name = Column(String(255), nullable=False)
+    disease_code = Column(String(64), nullable=False)
+    milestones = Column(JSON, default=list)
+    status = Column(String(32), default="active")
+    __table_args__ = (UniqueConstraint("tenant_id", "code", name="uq_pathway_template_tenant_code"),)
+
+
+class PathwayEnrollment(Base, AuditedMixin):
+    __tablename__ = "pathway_enrollments"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False, index=True)
+    pathway_id = Column(GUID(), ForeignKey("care_pathway_templates.id"), nullable=False, index=True)
+    status = Column(String(32), default="active")
+    current_milestone = Column(String(128), default="")
+    enrolled_at = Column(DateTime(timezone=True), default=utcnow)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class PaymentRefund(Base, AuditedMixin):
+    __tablename__ = "payment_refunds"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    payment_id = Column(GUID(), ForeignKey("payments.id"), nullable=False)
+    invoice_id = Column(GUID(), ForeignKey("invoices.id"), nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
+    reason = Column(Text)
+    status = Column(String(32), default="pending")
+    gateway_ref = Column(String(255))
 
 
 class DocumentMetadata(Base, AuditedMixin):

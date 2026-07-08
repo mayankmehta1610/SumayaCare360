@@ -130,3 +130,26 @@ def require_tenant(ctx: AuthContext = Depends(get_current_context)) -> AuthConte
     if not ctx.tenant_id:
         raise HTTPException(status_code=400, detail="Tenant context required")
     return ctx
+
+
+def resolve_tenant_context(
+    ctx: AuthContext = Depends(get_current_context),
+    db: Session = Depends(get_db),
+) -> AuthContext:
+    """MUT: resolve tenant for multi-tenant APIs. Super admin without tenant uses demo."""
+    if ctx.tenant_id:
+        return ctx
+    if ctx.user.is_super_admin:
+        demo = db.query(Tenant).filter(Tenant.tenant_code == "demo", Tenant.is_deleted == False).first()
+        if demo:
+            perms = permissions_for_role(ctx.user.role_code, db, demo.id)
+            return AuthContext(
+                user=ctx.user,
+                tenant=demo,
+                tenant_id=demo.id,
+                tenant_code=demo.tenant_code,
+                role_code=ctx.role_code,
+                permissions=perms,
+                correlation_id=ctx.correlation_id,
+            )
+    raise HTTPException(status_code=400, detail="Tenant context required — log in with tenant code (e.g. demo)")

@@ -25,6 +25,12 @@ import EngineeringHubPage from "./pages/EngineeringHubPage";
 import ExpandedAreaPage from "./pages/ExpandedAreaPage";
 import PhaseHubPage from "./pages/PhaseHubPage";
 import ModuleMapPage from "./pages/ModuleMapPage";
+import LaboratoryPage from "./pages/domains/LaboratoryPage";
+import RadiologyPage from "./pages/domains/RadiologyPage";
+import PharmacyPage from "./pages/domains/PharmacyPage";
+import InsuranceClaimsPage from "./pages/domains/InsuranceClaimsPage";
+import PathwaysPage from "./pages/domains/PathwaysPage";
+import InpatientPage from "./pages/domains/InpatientPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
@@ -71,6 +77,12 @@ const childRoutes = (
     <Route path="audit" element={<AuditPage />} />
     <Route path="administration" element={<AdministrationPage />} />
     <Route path="clinical-hub" element={<ClinicalHubPage />} />
+    <Route path="laboratory" element={<LaboratoryPage />} />
+    <Route path="radiology" element={<RadiologyPage />} />
+    <Route path="pharmacy" element={<PharmacyPage />} />
+    <Route path="insurance-claims" element={<InsuranceClaimsPage />} />
+    <Route path="pathways" element={<PathwaysPage />} />
+    <Route path="inpatient" element={<InpatientPage />} />
     <Route path="reports" element={<ReportsPage />} />
     <Route path="notifications" element={<NotificationsPage />} />
     <Route path="portal" element={<PatientPortalPage />} />

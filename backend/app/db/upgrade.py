@@ -18,6 +18,13 @@ def upgrade():
         if engine.dialect.name == "sqlite":
             _sqlite_add_column_if_missing(conn, "users", "mfa_enabled", "BOOLEAN DEFAULT 0")
             _sqlite_add_column_if_missing(conn, "users", "mfa_secret", "VARCHAR(255)")
+            _sqlite_add_column_if_missing(conn, "medicines", "stock_qty", "NUMERIC DEFAULT 0")
+            _sqlite_add_column_if_missing(conn, "lab_orders", "results", "JSON")
+            _sqlite_add_column_if_missing(conn, "radiology_orders", "encounter_id", "VARCHAR(36)")
+            _sqlite_add_column_if_missing(conn, "radiology_orders", "critical_flag", "BOOLEAN DEFAULT 0")
+            _sqlite_add_column_if_missing(conn, "radiology_orders", "scheduled_at", "DATETIME")
+            _sqlite_add_column_if_missing(conn, "pharmacy_dispenses", "prescription_line_id", "VARCHAR(36)")
+            _sqlite_add_column_if_missing(conn, "pharmacy_dispenses", "encounter_id", "VARCHAR(36)")
     db = SessionLocal()
     try:
         sync_platform_modules(db, None)
@@ -48,6 +55,26 @@ def upgrade():
             db.add(m.ReportDefinition(tenant_id=tenant.id, code="opd-dashboard", name="OPD Dashboard",
                                       audience="Operations", module_code="appointment-and-queue-management",
                                       created_by=aid, updated_by=aid))
+
+        from app.data.module_catalog import MODULE_CATALOG
+        from app.services import modules as mod_svc
+        for item in MODULE_CATALOG:
+            code = item["code"]
+            existing = db.query(m.ModuleRecord).filter(
+                m.ModuleRecord.tenant_id == tenant.id, m.ModuleRecord.module_code == code
+            ).count()
+            if existing > 0:
+                continue
+            subs = item.get("submodules") or ["General"]
+            sub = subs[0]
+            mod_svc.create_record(
+                db, tenant_id=tenant.id, module_code=code, submodule=sub,
+                title=f"Starter — {sub}", status="draft",
+                payload={"description": f"Demo workflow for {item['name']}", "priority": "medium"},
+                actor_id=aid or tenant.id,
+            )
+            db.flush()
+
         db.commit()
         print("Upgrade complete")
     finally:

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.models import entities as m
 from app.services.audit import write_audit
+from app.services.workflow_engine import validate_transition
 from app.data.module_catalog import MODULE_CATALOG, DEFAULT_STATUSES, DEFAULT_RECORD_FIELDS
 
 
@@ -115,6 +116,9 @@ def update_record_status(
     correlation_id: Optional[str] = None,
 ):
     old = row.status
+    validate_transition(
+        db, row.module_code, old, status, tenant_id=row.tenant_id,
+    )
     row.status = status
     row.updated_by = actor_id
     write_audit(

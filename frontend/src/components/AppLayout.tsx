@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
+import { buildFallbackPhases, type NavPhase } from "../data/moduleCatalog";
 
 type FlowModule = {
   code: string;
@@ -29,12 +30,19 @@ const EXTRA_LINKS = [
 export default function AppLayout() {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
-  const [phases, setPhases] = useState<Phase[]>([]);
+  const [phases, setPhases] = useState<NavPhase[]>([]);
+  const [navError, setNavError] = useState("");
 
   useEffect(() => {
-    api<{ phases: Phase[] }>("/platform/module-flow")
-      .then((d) => setPhases(d.phases))
-      .catch(() => setPhases([]));
+    api<{ phases: NavPhase[] }>("/platform/module-flow")
+      .then((d) => {
+        setPhases(d.phases);
+        setNavError("");
+      })
+      .catch((err) => {
+        setPhases(buildFallbackPhases());
+        setNavError(typeof err?.message === "string" ? err.message : "Using offline module catalog");
+      });
   }, []);
 
   const nav = useMemo(() => {
@@ -78,8 +86,12 @@ export default function AppLayout() {
       <aside className="sidebar">
         <div className="brand">SUMAYA Care 360</div>
         <div className="brand-sub">
-          {session?.tenant_code ? `/${session.tenant_code}` : "Super Admin"} · {session?.role_code}
+          {session?.tenant_code ? `/${session.tenant_code}` : "Super Admin (demo context)"} · {session?.role_code}
         </div>
+        {navError && <div className="muted" style={{ fontSize: "0.72rem", padding: "0 0.5rem" }}>{navError}</div>}
+        {phases.length === 0 && (
+          <div className="muted" style={{ fontSize: "0.75rem", padding: "0.5rem" }}>Loading modules…</div>
+        )}
         <nav className="nav">
           {nav.map((group) => (
             <div key={group.key} className="nav-group">

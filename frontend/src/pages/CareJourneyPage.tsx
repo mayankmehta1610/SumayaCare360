@@ -384,7 +384,7 @@ export default function CareJourneyPage() {
                     <p className="success">Visit complete — billing settled</p>
                     <div className="actions" style={{ marginTop: "1rem" }}>
                       <Link to="/clinical-hub" className="button-link">Order labs / IPD</Link>
-                      <Link to="/modules/insurance-and-claims" className="secondary button-link">Insurance claim</Link>
+                      <Link to="/insurance-claims" className="secondary button-link">Insurance claim</Link>
                       <Link to="/modules/post-treatment-patient-care" className="secondary button-link">Follow-up care</Link>
                       <Link to="/portal" className="secondary button-link">Patient portal</Link>
                     </div>

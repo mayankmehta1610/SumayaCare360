@@ -84,11 +84,11 @@ export default function ClinicalHubPage() {
       <h1 className="page-title">Clinical operations hub</h1>
       <p className="muted">Laboratory · IPD · Insurance — linked to encounters, billing & care programs</p>
       <div className="actions" style={{ marginBottom: "1rem" }}>
-        <Link to={`${prefix}/modules/laboratory-and-diagnostics`} className="secondary button-link">Lab module</Link>
-        <Link to={`${prefix}/modules/radiology-and-imaging`} className="secondary button-link">Radiology</Link>
-        <Link to={`${prefix}/modules/pharmacy-management`} className="secondary button-link">Pharmacy</Link>
-        <Link to={`${prefix}/modules/ipd-admission-and-ward-management`} className="secondary button-link">IPD module</Link>
-        <Link to={`${prefix}/modules/insurance-and-claims`} className="secondary button-link">Insurance module</Link>
+        <Link to={`${prefix}/laboratory`} className="secondary button-link">Laboratory</Link>
+        <Link to={`${prefix}/radiology`} className="secondary button-link">Radiology</Link>
+        <Link to={`${prefix}/pharmacy`} className="secondary button-link">Pharmacy</Link>
+        <Link to={`${prefix}/inpatient`} className="secondary button-link">Inpatient</Link>
+        <Link to={`${prefix}/insurance-claims`} className="secondary button-link">Insurance claims</Link>
         <Link to={`${prefix}/hubs/finance`} className="secondary button-link">Finance hub →</Link>
       </div>
       {error && <div className="error">{error}</div>}

@@ -52,9 +52,11 @@ export default function LoginPage() {
           <Link to={tenant ? `/${tenant}/forgot-password` : "/forgot-password"}>Forgot password?</Link>
         </p>
         <p className="muted" style={{ marginTop: "1rem", fontSize: "0.8rem" }}>
-          Demo: admin@demo.sumaya / TenantAdmin@360 · tenant <strong>demo</strong>
+          <strong>Hospital/clinic:</strong> admin@demo.sumaya / TenantAdmin@360 · tenant <strong>demo</strong>
           <br />
-          Super: superadmin@sumayacare360.com / SuperAdmin@360
+          Login URL: <strong>/demo/login</strong> (multi-tenant)
+          <br />
+          Super admin: superadmin@sumayacare360.com / SuperAdmin@360 (uses demo tenant context for modules)
         </p>
       </form>
     </div>

@@ -151,19 +151,19 @@ MODULE_FLOW: dict[str, dict] = {
     },
     "laboratory-and-diagnostics": {
         "phase": "diagnostics", "order": 1, "next": ["radiology-and-imaging"],
-        "links": [{"label": "Order lab (clinical hub)", "route": "/clinical-hub"}],
+        "links": [{"label": "Laboratory desk", "route": "/laboratory"}, {"label": "Clinical hub", "route": "/clinical-hub"}],
     },
     "radiology-and-imaging": {
         "phase": "diagnostics", "order": 2, "next": ["pharmacy-management"],
-        "links": [{"label": "Radiology module", "route": "/modules/radiology-and-imaging"}],
+        "links": [{"label": "Radiology desk", "route": "/radiology"}],
     },
     "pharmacy-management": {
         "phase": "diagnostics", "order": 3, "next": ["ipd-admission-and-ward-management"],
-        "links": [{"label": "Pharmacy module", "route": "/modules/pharmacy-management"}],
+        "links": [{"label": "Pharmacy desk", "route": "/pharmacy"}],
     },
     "ipd-admission-and-ward-management": {
         "phase": "inpatient", "order": 1, "next": ["nursing-and-care-plans"],
-        "links": [{"label": "Admit patient", "route": "/clinical-hub"}],
+        "links": [{"label": "Inpatient admissions", "route": "/inpatient"}, {"label": "Clinical hub", "route": "/clinical-hub"}],
     },
     "nursing-and-care-plans": {
         "phase": "inpatient", "order": 2, "next": ["operation-theatre-and-procedures"],
@@ -177,13 +177,14 @@ MODULE_FLOW: dict[str, dict] = {
     },
     "insurance-and-claims": {
         "phase": "finance", "order": 2, "next": ["revenue-cycle-management"],
-        "links": [{"label": "Submit claim", "route": "/clinical-hub"}],
+        "links": [{"label": "Claims desk", "route": "/insurance-claims"}, {"label": "Clinical hub", "route": "/clinical-hub"}],
     },
     "revenue-cycle-management": {
         "phase": "finance", "order": 3, "next": ["disease-and-care-pathways"],
     },
     "disease-and-care-pathways": {
         "phase": "care-programs", "order": 1, "next": ["chronic-disease-programs"],
+        "links": [{"label": "Pathways desk", "route": "/pathways"}],
     },
     "chronic-disease-programs": {
         "phase": "care-programs", "order": 2, "next": ["physiotherapy-and-rehab"],

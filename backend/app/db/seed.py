@@ -146,7 +146,7 @@ def seed():
             ("AMOX250", "Amoxicillin", "Capsule", "250mg"),
         ]:
             db.add(m.Medicine(tenant_id=tenant.id, code=code, name=name, form=form, strength=strength,
-                              created_by=super_admin.id, updated_by=super_admin.id))
+                              stock_qty=500, created_by=super_admin.id, updated_by=super_admin.id))
 
         db.add(m.LabTest(tenant_id=tenant.id, code="CBC", name="Complete Blood Count", sample_type="Blood",
                          created_by=super_admin.id, updated_by=super_admin.id))
@@ -224,21 +224,40 @@ def seed():
         from app.services.modules import sync_platform_modules
         sync_platform_modules(db, super_admin.id)
 
-        for wf_code, wf_name, mod, steps in [
+        _claim_transitions = [
+            {"from": "draft", "to": "submitted"},
+            {"from": "submitted", "to": "under_review"},
+            {"from": "under_review", "to": "approved"},
+            {"from": "under_review", "to": "denied"},
+            {"from": "approved", "to": "paid"},
+            {"from": "denied", "to": "draft"},
+        ]
+        _pathway_transitions = [
+            {"from": "active", "to": "paused"},
+            {"from": "active", "to": "completed"},
+            {"from": "active", "to": "withdrawn"},
+            {"from": "paused", "to": "active"},
+            {"from": "paused", "to": "withdrawn"},
+        ]
+        for wf_code, wf_name, mod, steps, transitions in [
             ("patient-opd", "Patient OPD Visit", "opd-clinical-workflow",
-             ["Register", "Book appointment", "Vitals", "Consultation", "Billing"]),
+             ["Register", "Book appointment", "Vitals", "Consultation", "Billing"], []),
             ("teleconsult", "Teleconsultation", "telemedicine-and-virtual-care",
-             ["Book slot", "Consent", "Video session", "Notes", "Follow-up"]),
+             ["Book slot", "Consent", "Video session", "Notes", "Follow-up"], []),
             ("ipd-admit", "IPD Admission", "ipd-admission-and-ward-management",
-             ["Request", "Eligibility", "Bed allocation", "Assessment", "Discharge"]),
+             ["Request", "Eligibility", "Bed allocation", "Assessment", "Discharge"], []),
             ("lab-dx", "Lab Diagnostics", "laboratory-and-diagnostics",
-             ["Order", "Sample", "Processing", "Result", "Notification"]),
+             ["Order", "Sample", "Processing", "Result", "Notification"], []),
             ("insurance-claim", "Insurance Claim", "insurance-and-claims",
-             ["Policy capture", "Eligibility", "Pre-auth", "Submission", "Settlement"]),
+             ["Policy capture", "Eligibility", "Pre-auth", "Submission", "Settlement"],
+             _claim_transitions),
+            ("care-pathway", "Care Pathway Enrollment", "disease-and-care-pathways",
+             ["Enroll", "Milestone 1", "Milestone 2", "Outcome", "Close"],
+             _pathway_transitions),
         ]:
             db.add(m.WorkflowDefinition(
                 tenant_id=tenant.id, workflow_code=wf_code, name=wf_name,
-                module_code=mod, steps=steps, transitions=[],
+                module_code=mod, steps=steps, transitions=transitions,
                 created_by=super_admin.id, updated_by=super_admin.id,
             ))
 

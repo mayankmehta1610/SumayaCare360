@@ -6,6 +6,10 @@ from app.api.v1.modules_router import router as modules_router
 from app.api.v1.expanded_router import router as expanded_router
 from app.api.v1.portal_router import router as portal_router
 from app.api.v1.docs_router import router as docs_router
+from app.api.v1.clinical_router import router as clinical_router
+from app.api.v1.finance_router import router as finance_router
+from app.api.v1.pathways_router import router as pathways_router
+from app.api.v1.masters_router import router as masters_router
 from app.middleware.api_audit import ApiAuditMiddleware
 from app.db.session import Base, engine
 import app.models.entities  # noqa: F401 — register models
@@ -28,10 +32,14 @@ app.add_middleware(
 app.add_middleware(ApiAuditMiddleware)
 
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(masters_router, prefix="/api/v1")
+app.include_router(finance_router, prefix="/api/v1")
+app.include_router(pathways_router, prefix="/api/v1")
 app.include_router(expanded_router, prefix="/api/v1")
 app.include_router(portal_router, prefix="/api/v1")
 app.include_router(docs_router, prefix="/api/v1")
 app.include_router(modules_router, prefix="/api/v1")
+app.include_router(clinical_router, prefix="/api/v1")
 
 
 @app.on_event("startup")

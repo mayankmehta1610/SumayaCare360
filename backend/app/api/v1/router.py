@@ -434,28 +434,6 @@ def list_masters(resource: str, ctx: AuthContext = Depends(require_tenant), db: 
     return result
 
 
-@router.post("/masters/{resource}")
-def create_master(resource: str, payload: MasterItemCreate, ctx: AuthContext = Depends(require_permission("masters:*")), db: Session = Depends(get_db)):
-    creators = {
-        "specialties": lambda: m.Specialty(tenant_id=ctx.tenant_id, code=payload.code, name=payload.name),
-        "diseases": lambda: m.Disease(tenant_id=ctx.tenant_id, code=payload.code, name=payload.name, icd_code=payload.extra.get("icd_code")),
-        "medicines": lambda: m.Medicine(tenant_id=ctx.tenant_id, code=payload.code, name=payload.name, form=payload.extra.get("form"), strength=payload.extra.get("strength")),
-        "lab-tests": lambda: m.LabTest(tenant_id=ctx.tenant_id, code=payload.code, name=payload.name, sample_type=payload.extra.get("sample_type")),
-        "tariffs": lambda: m.Tariff(tenant_id=ctx.tenant_id, code=payload.code, name=payload.name, category=payload.extra.get("category", "service"), amount=payload.extra.get("amount", 0)),
-    }
-    if resource not in creators:
-        raise HTTPException(400, "Create not supported for this master via MVP endpoint")
-    row = creators[resource]()
-    row.created_by = ctx.user.id
-    row.updated_by = ctx.user.id
-    db.add(row)
-    write_audit(db, tenant_id=ctx.tenant_id, actor_user_id=ctx.user.id, action="CREATE",
-                entity_type=resource, new_values=payload.model_dump(), correlation_id=ctx.correlation_id)
-    db.commit()
-    db.refresh(row)
-    return {"id": str(row.id), "code": row.code, "name": row.name}
-
-
 # ───────────────────────── Patients ─────────────────────────
 @router.get("/patients", response_model=list[PatientOut])
 def search_patients(

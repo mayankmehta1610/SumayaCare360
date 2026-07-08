@@ -324,4 +324,5 @@ a.secondary.button-link {
   gap: 0.85rem;
 }
 .flow-phase-card { cursor: pointer; transition: transform 0.15s; }
-.flow-phase-card:hover { transform: translateY(-2px); }
+.module-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.module-tabs button { font-size: 0.82rem; padding: 0.35rem 0.75rem; }

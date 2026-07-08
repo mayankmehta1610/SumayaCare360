@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import { api } from "../api/client";
 import ModuleFlowBar from "../components/ModuleFlowBar";
 
@@ -20,10 +20,14 @@ type RecordRow = {
   payload: Record<string, unknown>;
 };
 
-export default function ModulePage() {
-  const { moduleCode = "" } = useParams();
+type Props = { moduleCode?: string };
+
+export default function ModulePage({ moduleCode: fixedCode }: Props) {
+  const { moduleCode: paramCode = "" } = useParams();
+  const moduleCode = fixedCode || paramCode;
   const [mod, setMod] = useState<PlatformModule | null>(null);
   const [rows, setRows] = useState<RecordRow[]>([]);
+  const [activeTab, setActiveTab] = useState("");
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ submodule: "", title: "", description: "", priority: "medium", status: "draft" });
@@ -31,16 +35,35 @@ export default function ModulePage() {
   async function load() {
     const modules = await api<PlatformModule[]>("/platform/modules");
     const found = modules.find((m) => m.code === moduleCode);
-    if (!found) throw new Error("Module not found");
+    if (!found) throw new Error(`Module not found: ${moduleCode}`);
     setMod(found);
-    setForm((f) => ({ ...f, submodule: found.submodules[0] || "" }));
-    const data = await api<RecordRow[]>(`/modules/${moduleCode}`);
+    const tab = activeTab || found.submodules[0] || "";
+    if (!activeTab && tab) setActiveTab(tab);
+    const q = tab ? `?submodule=${encodeURIComponent(tab)}` : "";
+    const data = await api<RecordRow[]>(`/modules/${moduleCode}${q}`);
     setRows(data);
+    setForm((f) => ({ ...f, submodule: tab || found.submodules[0] || "" }));
   }
 
   useEffect(() => {
+    setActiveTab("");
     load().catch((e) => setError(e.message));
   }, [moduleCode]);
+
+  useEffect(() => {
+    if (!mod || !activeTab) return;
+    api<RecordRow[]>(`/modules/${moduleCode}?submodule=${encodeURIComponent(activeTab)}`)
+      .then(setRows)
+      .catch((e) => setError(e.message));
+    setForm((f) => ({ ...f, submodule: activeTab }));
+  }, [activeTab, moduleCode, mod?.code]);
+
+  const tabCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    if (!mod) return counts;
+    for (const s of mod.submodules) counts[s] = 0;
+    return counts;
+  }, [mod]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -54,7 +77,7 @@ export default function ModulePage() {
         payload: { description: form.description, priority: form.priority },
       }),
     });
-    setMsg("Record created");
+    setMsg("Record saved to database");
     setForm((f) => ({ ...f, title: "", description: "" }));
     await load();
   }
@@ -70,15 +93,29 @@ export default function ModulePage() {
     <div>
       <ModuleFlowBar moduleCode={moduleCode} />
       <h1 className="page-title">{mod.name}</h1>
-      <p className="muted">Database-driven workflow records · tenant scoped · audited</p>
+      <p className="muted">All {mod.submodules.length} submodules · tenant-scoped · audited · data persists</p>
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
+
+      <div className="module-tabs" style={{ marginBottom: "1rem" }}>
+        {mod.submodules.map((s) => (
+          <button
+            key={s}
+            type="button"
+            className={activeTab === s ? "" : "secondary"}
+            onClick={() => setActiveTab(s)}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
       <div className="grid-2">
         <form className="card" onSubmit={(e) => onCreate(e).catch((err) => setError(err.message))}>
-          <h3 style={{ marginTop: 0 }}>Create record</h3>
+          <h3 style={{ marginTop: 0 }}>Create — {activeTab || form.submodule}</h3>
           <div className="field">
-            <label>Submodule</label>
-            <select required value={form.submodule} onChange={(e) => setForm({ ...form, submodule: e.target.value })}>
+            <label>Submodule tab</label>
+            <select required value={form.submodule} onChange={(e) => { setForm({ ...form, submodule: e.target.value }); setActiveTab(e.target.value); }}>
               {mod.submodules.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
@@ -111,30 +148,32 @@ export default function ModulePage() {
               </select>
             </div>
           </div>
-          <button type="submit">Save</button>
+          <button type="submit">Save record</button>
         </form>
         <div className="card table-wrap">
-          <h3 style={{ marginTop: 0 }}>Records ({rows.length})</h3>
+          <h3 style={{ marginTop: 0 }}>{activeTab} records ({rows.length})</h3>
           <table>
             <thead>
-              <tr><th>Ref</th><th>Submodule</th><th>Title</th><th>Status</th><th>Actions</th></tr>
+              <tr><th>Ref</th><th>Title</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
+              {rows.length === 0 && (
+                <tr><td colSpan={4} className="muted">No records yet — create one above</td></tr>
+              )}
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td>{r.reference_no}</td>
-                  <td>{r.submodule}</td>
                   <td>{r.title}</td>
                   <td><span className="badge">{r.status}</span></td>
                   <td className="actions">
-                    {r.status !== "completed" && (
+                    {r.status !== "in_progress" && r.status !== "completed" && (
                       <button type="button" className="secondary" onClick={() => setStatus(r.id, "in_progress").catch((e) => setError(e.message))}>Start</button>
+                    )}
+                    {r.status !== "completed" && (
+                      <button type="button" className="secondary" onClick={() => setStatus(r.id, "completed").catch((e) => setError(e.message))}>Complete</button>
                     )}
                     {r.status !== "approved" && (
                       <button type="button" className="secondary" onClick={() => api(`/modules/${moduleCode}/${r.id}/approve`, { method: "POST" }).then(() => load()).catch((e) => setError(e.message))}>Approve</button>
-                    )}
-                    {r.status !== "rejected" && (
-                      <button type="button" className="secondary" onClick={() => api(`/modules/${moduleCode}/${r.id}/reject`, { method: "POST" }).then(() => load()).catch((e) => setError(e.message))}>Reject</button>
                     )}
                   </td>
                 </tr>

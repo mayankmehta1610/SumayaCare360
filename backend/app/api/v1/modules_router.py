@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.db.session import get_db
-from app.core.deps import AuthContext, require_tenant
+from app.core.deps import AuthContext, require_tenant, resolve_tenant_context, get_current_context
 from app.models import entities as m
 from app.services import modules as mod_svc
 from app.services.care_journey import discharge_ipd
@@ -14,7 +14,7 @@ from app.data.slug_aliases import normalize_slug, SLUG_ALIASES
 
 router = APIRouter(tags=["modules"])
 
-_CANONICAL_MODULES = {x["code"] for x in MODULE_CATALOG if not x.get("dedicated")}
+_CANONICAL_MODULES = {x["code"] for x in MODULE_CATALOG}
 MODULE_CODES = set(_CANONICAL_MODULES) | set(SLUG_ALIASES.keys())
 RESERVED = {
     "health", "auth", "super-admin", "admin", "masters", "patients", "providers",
@@ -63,7 +63,7 @@ def _validate_module(module_code: str):
 
 
 @router.get("/platform/modules")
-def list_platform_modules(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+def list_platform_modules(ctx: AuthContext = Depends(get_current_context), db: Session = Depends(get_db)):
     rows = db.query(m.PlatformModule).filter(m.PlatformModule.active == True, m.PlatformModule.is_deleted == False).order_by(
         m.PlatformModule.category, m.PlatformModule.name
     ).all()
@@ -88,7 +88,7 @@ def list_platform_modules(ctx: AuthContext = Depends(require_tenant), db: Sessio
 
 
 @router.get("/platform/workflows")
-def list_workflows(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+def list_workflows(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     rows = db.query(m.WorkflowDefinition).filter(
         or_(m.WorkflowDefinition.tenant_id == ctx.tenant_id, m.WorkflowDefinition.tenant_id.is_(None)),
         m.WorkflowDefinition.is_deleted == False,
@@ -97,7 +97,7 @@ def list_workflows(ctx: AuthContext = Depends(require_tenant), db: Session = Dep
 
 
 @router.get("/platform/reports")
-def list_reports(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+def list_reports(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     rows = db.query(m.ReportDefinition).filter(
         or_(m.ReportDefinition.tenant_id == ctx.tenant_id, m.ReportDefinition.tenant_id.is_(None)),
         m.ReportDefinition.is_deleted == False,
@@ -106,13 +106,13 @@ def list_reports(ctx: AuthContext = Depends(require_tenant), db: Session = Depen
 
 
 @router.get("/platform/module-flow")
-def get_module_flow(ctx: AuthContext = Depends(require_tenant)):
+def get_module_flow(ctx: AuthContext = Depends(get_current_context)):
     from app.data.module_flow import build_module_flow_response
     return build_module_flow_response()
 
 
 @router.get("/platform/module-flow/{module_code}")
-def get_module_flow_detail(module_code: str, ctx: AuthContext = Depends(require_tenant)):
+def get_module_flow_detail(module_code: str, ctx: AuthContext = Depends(get_current_context)):
     from app.data.module_flow import flow_for_module
     detail = flow_for_module(module_code)
     if not detail:
@@ -126,7 +126,7 @@ def list_module_records(
     query: str = "",
     status: Optional[str] = None,
     submodule: Optional[str] = None,
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     module_code = _validate_module(module_code)
@@ -138,7 +138,7 @@ def list_module_records(
 def get_module_record(
     module_code: str,
     record_id: UUID,
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     module_code = _validate_module(module_code)
@@ -152,7 +152,7 @@ def get_module_record(
 def create_module_record(
     module_code: str,
     payload: ModuleRecordCreate,
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     module_code = _validate_module(module_code)
@@ -179,7 +179,7 @@ def update_module_status(
     module_code: str,
     record_id: UUID,
     status: str = Query(...),
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     module_code = _validate_module(module_code)
@@ -200,7 +200,7 @@ def patch_module_record(
     module_code: str,
     record_id: UUID,
     payload: ModuleRecordUpdate,
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     module_code = _validate_module(module_code)
@@ -219,7 +219,7 @@ def patch_module_record(
 def delete_module_record(
     module_code: str,
     record_id: UUID,
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     module_code = _validate_module(module_code)
@@ -235,7 +235,7 @@ def delete_module_record(
 def approve_module_record(
     module_code: str,
     record_id: UUID,
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     module_code = _validate_module(module_code)
@@ -251,7 +251,7 @@ def approve_module_record(
 def reject_module_record(
     module_code: str,
     record_id: UUID,
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     module_code = _validate_module(module_code)
@@ -266,7 +266,7 @@ def reject_module_record(
 @router.post("/modules/{module_code}/export")
 def export_module_records(
     module_code: str,
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     module_code = _validate_module(module_code)
@@ -275,7 +275,7 @@ def export_module_records(
 
 
 @router.get("/{module_code}")
-def api_backlog_list(module_code: str, query: str = "", ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+def api_backlog_list(module_code: str, query: str = "", ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     if module_code in RESERVED or module_code not in MODULE_CODES:
         raise HTTPException(404, "Not found")
     canonical = normalize_slug(module_code)
@@ -284,7 +284,7 @@ def api_backlog_list(module_code: str, query: str = "", ctx: AuthContext = Depen
 
 
 @router.post("/{module_code}")
-def api_backlog_create(module_code: str, payload: ModuleRecordCreate, ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+def api_backlog_create(module_code: str, payload: ModuleRecordCreate, ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     if module_code in RESERVED or module_code not in MODULE_CODES:
         raise HTTPException(404, "Not found")
     canonical = normalize_slug(module_code)
@@ -299,39 +299,10 @@ def api_backlog_create(module_code: str, payload: ModuleRecordCreate, ctx: AuthC
     return _serialize_record(row)
 
 
-# ── Specialized clinical entities ──
-
-@router.get("/clinical/lab-orders")
-def list_lab_orders(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
-    rows = db.query(m.LabOrder).filter(m.LabOrder.tenant_id == ctx.tenant_id, m.LabOrder.is_deleted == False).all()
-    return [{"id": str(r.id), "order_no": r.order_no, "test_code": r.test_code, "status": r.status, "patient_id": str(r.patient_id)} for r in rows]
-
-
-@router.post("/clinical/lab-orders")
-def create_lab_order(
-    patient_id: UUID,
-    test_code: str,
-    encounter_id: Optional[UUID] = None,
-    provider_id: Optional[UUID] = None,
-    ctx: AuthContext = Depends(require_tenant),
-    db: Session = Depends(get_db),
-):
-    test = db.query(m.LabTest).filter(m.LabTest.tenant_id == ctx.tenant_id, m.LabTest.code == test_code).first()
-    if not test:
-        raise HTTPException(400, "Unknown test — select from lab test master")
-    n = db.query(m.LabOrder).filter(m.LabOrder.tenant_id == ctx.tenant_id).count() + 1
-    row = m.LabOrder(
-        tenant_id=ctx.tenant_id, patient_id=patient_id, provider_id=provider_id,
-        encounter_id=encounter_id, order_no=f"LAB-{n:06d}", test_code=test_code,
-        created_by=ctx.user.id, updated_by=ctx.user.id,
-    )
-    db.add(row)
-    db.commit()
-    return {"id": str(row.id), "order_no": row.order_no}
-
+# ── Specialized clinical entities (IPD, claims; domain APIs → clinical_router) ──
 
 @router.get("/clinical/ipd-admissions")
-def list_ipd(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+def list_ipd(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     rows = db.query(m.IpdAdmission).filter(m.IpdAdmission.tenant_id == ctx.tenant_id).all()
     return [{"id": str(r.id), "admission_no": r.admission_no, "bed_code": r.bed_code, "status": r.status, "patient_id": str(r.patient_id)} for r in rows]
 
@@ -342,7 +313,7 @@ def admit_ipd(
     bed_code: str,
     ward_code: str = "GEN",
     diagnosis_code: Optional[str] = None,
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     bed = db.query(m.Bed).filter(m.Bed.tenant_id == ctx.tenant_id, m.Bed.bed_code == bed_code, m.Bed.status == "available").first()
@@ -363,7 +334,7 @@ def admit_ipd(
 @router.post("/clinical/ipd-admissions/{admission_id}/discharge")
 def discharge_ipd_admission(
     admission_id: UUID,
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     tenant = db.query(m.Tenant).filter(m.Tenant.id == ctx.tenant_id).first()
@@ -375,10 +346,22 @@ def discharge_ipd_admission(
     return result
 
 
+def _serialize_claim(r: m.InsuranceClaim) -> dict:
+    return {
+        "id": str(r.id),
+        "claim_no": r.claim_no,
+        "payer_code": r.payer_code,
+        "status": r.status,
+        "amount": float(r.amount or 0),
+        "patient_id": str(r.patient_id),
+        "policy_no": r.policy_no,
+    }
+
+
 @router.get("/clinical/insurance-claims")
-def list_claims(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
-    rows = db.query(m.InsuranceClaim).filter(m.InsuranceClaim.tenant_id == ctx.tenant_id).all()
-    return [{"id": str(r.id), "claim_no": r.claim_no, "payer_code": r.payer_code, "status": r.status, "amount": float(r.amount or 0)} for r in rows]
+def list_claims(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
+    rows = db.query(m.InsuranceClaim).filter(m.InsuranceClaim.tenant_id == ctx.tenant_id).order_by(m.InsuranceClaim.created_at.desc()).all()
+    return [_serialize_claim(r) for r in rows]
 
 
 @router.post("/clinical/insurance-claims")
@@ -387,7 +370,7 @@ def create_claim(
     payer_code: str,
     amount: float,
     policy_no: str = "",
-    ctx: AuthContext = Depends(require_tenant),
+    ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     payer = db.query(m.InsurancePayer).filter(m.InsurancePayer.tenant_id == ctx.tenant_id, m.InsurancePayer.code == payer_code).first()
@@ -401,22 +384,43 @@ def create_claim(
     )
     db.add(row)
     db.commit()
-    return {"id": str(row.id), "claim_no": row.claim_no}
+    return _serialize_claim(row)
+
+
+@router.patch("/clinical/insurance-claims/{claim_id}/status")
+def update_claim_status(
+    claim_id: UUID,
+    status: str = Query(...),
+    ctx: AuthContext = Depends(resolve_tenant_context),
+    db: Session = Depends(get_db),
+):
+    row = db.query(m.InsuranceClaim).filter(
+        m.InsuranceClaim.id == claim_id, m.InsuranceClaim.tenant_id == ctx.tenant_id
+    ).first()
+    if not row:
+        raise HTTPException(404, "Claim not found")
+    allowed = {"draft", "submitted", "under_review", "approved", "denied", "paid"}
+    if status not in allowed:
+        raise HTTPException(400, f"Invalid status. Use: {sorted(allowed)}")
+    row.status = status
+    row.updated_by = ctx.user.id
+    db.commit()
+    return _serialize_claim(row)
 
 
 @router.get("/admin/users")
-def list_users(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+def list_users(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     rows = db.query(m.User).filter(m.User.tenant_id == ctx.tenant_id, m.User.is_deleted == False).all()
     return [{"id": str(r.id), "email": r.email, "full_name": r.full_name, "role_code": r.role_code, "status": r.status} for r in rows]
 
 
 @router.get("/admin/room-categories")
-def list_room_categories(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+def list_room_categories(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     rows = db.query(m.RoomCategory).filter(m.RoomCategory.tenant_id == ctx.tenant_id).all()
     return [{"id": str(r.id), "code": r.code, "name": r.name, "tariff_class": r.tariff_class, "status": r.status} for r in rows]
 
 
 @router.get("/admin/beds")
-def list_beds(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+def list_beds(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     rows = db.query(m.Bed).filter(m.Bed.tenant_id == ctx.tenant_id).all()
     return [{"id": str(r.id), "bed_code": r.bed_code, "room_code": r.room_code, "status": r.status, "category_code": r.category_code} for r in rows]
