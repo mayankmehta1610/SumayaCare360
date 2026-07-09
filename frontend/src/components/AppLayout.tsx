@@ -22,6 +22,7 @@ type Phase = {
 
 const EXTRA_LINKS = [
   { to: "/dashboard", label: "Dashboard", phase: "_top" },
+  { to: "/demo-tour", label: "🎬 Demo tour (voice)", phase: "_top" },
   { to: "/module-map", label: "Module map", phase: "_top" },
   { to: "/care-journey", label: "Care journey (E2E)", phase: "clinical" },
   { to: "/tenants", label: "Tenants (Super)", phase: "_top", superOnly: true },

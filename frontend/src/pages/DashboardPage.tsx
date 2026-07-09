@@ -83,6 +83,7 @@ export default function DashboardPage() {
         <p className="muted">Patient → appointment → encounter → clinical chart → discharge → billing → payment</p>
         <div className="actions">
           <Link to={`${prefix}/care-journey`} className="button-link">Launch care journey</Link>
+          <Link to={`${prefix}/demo-tour`} className="button-link secondary">🎬 Voice demo tour</Link>
           <Link to={`${prefix}/module-map`} className="secondary button-link">View all modules</Link>
         </div>
       </div>
