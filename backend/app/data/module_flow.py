@@ -7,7 +7,7 @@ CARE_PHASES = [
     {
         "id": "platform",
         "order": 1,
-        "name": "1 · Platform & setup",
+        "name": "Platform & setup",
         "description": "Tenant config, security, masters, governance",
         "hub_route": "/hubs/platform",
         "icon": "⚙️",
@@ -15,7 +15,7 @@ CARE_PHASES = [
     {
         "id": "front-office",
         "order": 2,
-        "name": "2 · Front office",
+        "name": "Front office",
         "description": "Register patients, providers, appointments, triage",
         "hub_route": "/hubs/front-office",
         "icon": "🏥",
@@ -23,7 +23,7 @@ CARE_PHASES = [
     {
         "id": "clinical",
         "order": 3,
-        "name": "3 · Clinical care",
+        "name": "Clinical care",
         "description": "OPD encounter, telemedicine, end-to-end journey",
         "hub_route": "/hubs/clinical",
         "icon": "🩺",
@@ -31,7 +31,7 @@ CARE_PHASES = [
     {
         "id": "diagnostics",
         "order": 4,
-        "name": "4 · Diagnostics & pharmacy",
+        "name": "Diagnostics & pharmacy",
         "description": "Lab, radiology, dispensing linked to encounters",
         "hub_route": "/hubs/diagnostics",
         "icon": "🔬",
@@ -39,7 +39,7 @@ CARE_PHASES = [
     {
         "id": "inpatient",
         "order": 5,
-        "name": "5 · Inpatient",
+        "name": "Inpatient",
         "description": "Admission, nursing, OT, ward management",
         "hub_route": "/hubs/inpatient",
         "icon": "🛏️",
@@ -47,7 +47,7 @@ CARE_PHASES = [
     {
         "id": "finance",
         "order": 6,
-        "name": "6 · Finance & RCM",
+        "name": "Finance & RCM",
         "description": "Estimates, invoices, insurance, revenue cycle",
         "hub_route": "/hubs/finance",
         "icon": "💳",
@@ -55,7 +55,7 @@ CARE_PHASES = [
     {
         "id": "care-programs",
         "order": 7,
-        "name": "7 · Care programs",
+        "name": "Care programs",
         "description": "Pathways, chronic care, rehab, specialty programs",
         "hub_route": "/hubs/care-programs",
         "icon": "📋",
@@ -63,7 +63,7 @@ CARE_PHASES = [
     {
         "id": "operations",
         "order": 8,
-        "name": "8 · Operations",
+        "name": "Operations",
         "description": "Ambulance, catering, inventory, marketplace, GPS",
         "hub_route": "/hubs/operations",
         "icon": "🚑",
@@ -71,7 +71,7 @@ CARE_PHASES = [
     {
         "id": "engagement",
         "order": 9,
-        "name": "9 · Engagement",
+        "name": "Engagement",
         "description": "Notifications, patient portal, mobile apps",
         "hub_route": "/hubs/engagement",
         "icon": "📱",
@@ -79,7 +79,7 @@ CARE_PHASES = [
     {
         "id": "analytics",
         "order": 10,
-        "name": "10 · Analytics & compliance",
+        "name": "Analytics & compliance",
         "description": "Reports, audit, engineering APIs",
         "hub_route": "/hubs/analytics",
         "icon": "📊",

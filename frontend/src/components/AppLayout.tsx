@@ -6,6 +6,11 @@ import BrandLogo from "./ui/BrandLogo";
 import NavIcon, { normalizeRoute } from "./ui/NavIcon";
 import { canAccessRouteSession, homeRouteForRole, stripTenantPrefix } from "../utils/roleAccess";
 
+/** Strip legacy "1 · Phase name" prefixes from navigation labels. */
+function cleanNavLabel(label: string): string {
+  return label.replace(/^\d+\s*[·.\-–]\s*/, "").trim() || label;
+}
+
 export default function AppLayout() {
   const { session, navigation, logout } = useAuth();
   const navigate = useNavigate();
@@ -36,7 +41,7 @@ export default function AppLayout() {
     for (const phase of navigation.phases) {
       const items: { to: string; label: string; route: string }[] = [];
       if (phase.hub_visible !== false) {
-        const hubLabel = phase.name.split("·")[1]?.trim() || phase.name;
+        const hubLabel = cleanNavLabel(phase.name);
         items.push({
           to: withPrefix(phase.hub_route),
           label: hubLabel,
@@ -57,7 +62,7 @@ export default function AppLayout() {
         return true;
       });
       if (unique.length > 0) {
-        groups.push({ key: phase.id, label: phase.name, items: unique });
+        groups.push({ key: phase.id, label: cleanNavLabel(phase.name), items: unique });
       }
     }
 

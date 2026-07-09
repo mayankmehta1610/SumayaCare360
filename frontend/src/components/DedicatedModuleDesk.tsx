@@ -5,7 +5,7 @@ import DataTable, { Column } from "./DataTable";
 import ModuleFlowBar from "./ModuleFlowBar";
 import ModuleFeaturePanel from "./ModuleFeaturePanel";
 import { useAuth } from "../context/AuthContext";
-import { canDelete, canWrite } from "../hooks/usePermissions";
+import { canDelete, canWriteWorkspace } from "../hooks/usePermissions";
 import { exportFromApi } from "../utils/export";
 
 export type DomainMeta = {
@@ -37,7 +37,7 @@ type Props = {
 
 export default function DedicatedModuleDesk({ moduleCode, description, linkPatient, extraFields = [] }: Props) {
   const { session } = useAuth();
-  const write = canWrite(session);
+  const write = canWriteWorkspace(session);
   const del = canDelete(session);
 
   const [meta, setMeta] = useState<DomainMeta | null>(null);

@@ -1,9 +1,17 @@
+from __future__ import annotations
+
+import re
+
 """
 Strict per-role screen access — each role sees only the routes listed here.
 TENANT_ADMIN / SUPER_ADMIN get full access.
 """
 
-from __future__ import annotations
+_NAV_NUM_PREFIX = re.compile(r"^\d+\s*[·.\-–]\s*")
+
+
+def nav_label(name: str) -> str:
+    return _NAV_NUM_PREFIX.sub("", name or "").strip() or name
 
 # Every routable screen in the tenant app (excludes /tenants — super-admin only)
 ALL_TENANT_ROUTES: frozenset[str] = frozenset({
@@ -159,6 +167,7 @@ def filter_module_flow(flow: dict, role_code: str, is_super_admin: bool = False)
             continue
         phase_out = {
             **phase,
+            "name": nav_label(phase.get("name", "")),
             "modules": modules,
             "module_count": len(modules),
             "hub_visible": full or hub_route in allowed,

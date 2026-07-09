@@ -40,7 +40,8 @@ def is_demo_complete(db: Session, tenant_id: UUID) -> bool:
     records = db.query(m.ModuleRecord).filter(m.ModuleRecord.tenant_id == tenant_id).count()
     invoices = db.query(m.Invoice).filter(m.Invoice.tenant_id == tenant_id).count()
     lab = db.query(m.LabOrder).filter(m.LabOrder.tenant_id == tenant_id).count()
-    return records >= 60 and invoices >= 4 and lab >= 5
+    encounters = db.query(m.Encounter).filter(m.Encounter.tenant_id == tenant_id, m.Encounter.is_deleted == False).count()
+    return records >= 40 and invoices >= 3 and lab >= 3 and encounters >= 3
 
 
 def ensure_demo_data(db: Session) -> bool:

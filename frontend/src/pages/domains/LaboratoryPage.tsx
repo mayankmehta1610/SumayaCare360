@@ -5,7 +5,7 @@ import { fetchPatients } from "../../api/list";
 import ClinicalListDesk from "../../components/ClinicalListDesk";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
 import { useAuth } from "../../context/AuthContext";
-import { canWrite } from "../../hooks/usePermissions";
+import { canOrderClinical, canWrite } from "../../hooks/usePermissions";
 
 type LabOrder = {
   id: string;
@@ -21,6 +21,7 @@ type LabOrder = {
 export default function LaboratoryPage() {
   const { session } = useAuth();
   const write = canWrite(session, "laboratory");
+  const canOrder = canOrderClinical(session, "laboratory");
   const [patients, setPatients] = useState<any[]>([]);
   const [tests, setTests] = useState<any[]>([]);
   const [workflow, setWorkflow] = useState<{ statuses: string[]; next: Record<string, string> }>({ statuses: [], next: {} });
@@ -104,7 +105,7 @@ export default function LaboratoryPage() {
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
 
-      {write && (
+      {canOrder && (
         <div className="grid-2" style={{ marginBottom: "1rem" }}>
           <form className="card" onSubmit={(e) => createOrder(e).catch((err) => setError(err.message))}>
             <h3 style={{ marginTop: 0 }}>New lab order</h3>
@@ -129,6 +130,7 @@ export default function LaboratoryPage() {
             <button type="submit">Order test</button>
           </form>
 
+          {write && (
           <form className="card" onSubmit={(e) => saveResult(e).catch((err) => setError(err.message))}>
             <h3 style={{ marginTop: 0 }}>Result entry</h3>
             <div className="field">
@@ -154,6 +156,7 @@ export default function LaboratoryPage() {
             </label>
             <button type="submit">Enter results</button>
           </form>
+          )}
         </div>
       )}
 
@@ -166,8 +169,8 @@ export default function LaboratoryPage() {
         rowKey={(o) => o.id}
         searchPlaceholder="Search order no or test…"
         statusOptions={workflow.statuses}
-        canWrite={write}
-        renderActions={write ? (o, reload) => (
+        canWrite={canOrder || write}
+        renderActions={(canOrder || write) ? (o, reload) => (
           workflow.next[o.status] ? (
             <button type="button" className="secondary" onClick={() => advanceStatus(o, reload).catch((e) => setError(e.message))}>
               → {workflow.next[o.status]}

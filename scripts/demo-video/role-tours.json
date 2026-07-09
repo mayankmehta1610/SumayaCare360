@@ -3,13 +3,14 @@
     "role": "TENANT_ADMIN",
     "email": "admin@demo.sumaya",
     "password": "TenantAdmin@360",
-    "intro": "You are logged in as Tenant Admin. This role owns the full hospital platform. The sidebar lists every module. All tables below load live rows from PostgreSQL — eight demo patients, lab orders, billing, and records across thirty-six modules.",
+    "intro": "You are logged in as Tenant Admin. This role owns the full hospital platform. The sidebar groups modules by care phase with clear labels — no numbered prefixes. Create and Save buttons appear on every module desk. All tables load live rows from PostgreSQL — eight demo patients, lab orders, billing, and records across thirty-six modules.",
     "routes": [
       { "path": "/dashboard", "say": "The admin dashboard shows every KPI your role can access — patient counts, appointments, lab queue, and revenue — each number queried from the database." },
       { "path": "/patients", "say": "Patients lists all registered patients with search, pagination, and export. Demo tenant has eight patients with MRNs starting DEMO." },
       { "path": "/appointments", "say": "Appointments shows booked slots, queue tokens, and telemedicine visits pulled from the appointments table." },
       { "path": "/billing", "say": "Billing displays invoices and payment status. Demo data includes multiple issued invoices linked to real patients." },
-      { "path": "/laboratory", "say": "Laboratory shows CBC orders in various workflow states — ordered, collected, verified — all from lab_orders." },
+      { "path": "/laboratory", "say": "Laboratory shows CBC orders in various workflow states — ordered, collected, verified — all from lab_orders. Lab techs enter results; doctors can order new tests from this screen." },
+      { "path": "/inventory", "say": "Inventory and procurement desk with Create and Save on every submodule tab — demo stock and purchase records loaded from module_records." },
       { "path": "/reports", "say": "Reports runs analytics definitions stored in the database and returns detail rows you can export." },
       { "path": "/module-map", "say": "Module map is the full catalog of thirty-six integrated modules with work-item counts from module_records." }
     ]
@@ -24,7 +25,7 @@
       { "path": "/patients", "say": "Read-only patient list for chart review. Search and export work on live patient rows." },
       { "path": "/encounters", "say": "Encounters lists OPD visits with chief complaint, vitals, and clinical notes stored in the database." },
       { "path": "/telemedicine", "say": "Telemedicine shows completed and scheduled video sessions with room IDs from telemedicine_sessions." },
-      { "path": "/laboratory", "say": "Doctors can view lab orders and results. Orders reference master test codes like CBC from lab_tests." },
+      { "path": "/laboratory", "say": "Doctors can view lab orders, order new tests, and track results. Orders reference master test codes like CBC from lab_tests." },
       { "path": "/pharmacy", "say": "Pharmacy queue shows dispense requests — read access for doctors to track prescriptions." }
     ]
   },
@@ -37,7 +38,7 @@
       { "path": "/dashboard", "say": "Nurse dashboard KPIs focus on patients, encounters, nursing tasks, and inpatient census — not revenue or claims." },
       { "path": "/patients", "say": "Patient list for ward rounds and vitals capture." },
       { "path": "/encounters", "say": "Active and closed encounters where nurses document vitals and progress notes." },
-      { "path": "/nursing", "say": "Nursing tasks desk shows vitals checks, medication administration, and wound care items assigned from nursing_tasks." },
+      { "path": "/nursing", "say": "Nursing tasks desk shows vitals checks, medication administration, and wound care items. Use Create task and Save to add new nursing work from nursing_tasks." },
       { "path": "/inpatient", "say": "Inpatient admissions with bed allocation — demo patient Vikram Singh is admitted to ward GEN." }
     ]
   },

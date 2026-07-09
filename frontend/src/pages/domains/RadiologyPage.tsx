@@ -5,7 +5,7 @@ import { fetchPatients } from "../../api/list";
 import ClinicalListDesk from "../../components/ClinicalListDesk";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
 import { useAuth } from "../../context/AuthContext";
-import { canDelete, canWrite } from "../../hooks/usePermissions";
+import { canDelete, canOrderClinical, canWrite } from "../../hooks/usePermissions";
 
 type RadOrder = {
   id: string;
@@ -22,6 +22,7 @@ type Study = { code: string; name: string };
 export default function RadiologyPage() {
   const { session } = useAuth();
   const write = canWrite(session, "radiology");
+  const canOrder = canOrderClinical(session, "radiology");
   const del = canDelete(session, "radiology");
   const [patients, setPatients] = useState<any[]>([]);
   const [studies, setStudies] = useState<Study[]>([]);
@@ -118,7 +119,7 @@ export default function RadiologyPage() {
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
 
-      {write && (
+      {canOrder && (
         <div className="grid-2" style={{ marginBottom: "1rem" }}>
           <form className="card" onSubmit={(e) => createOrder(e).catch((err) => setError(err.message))}>
             <h3 style={{ marginTop: 0 }}>New imaging order</h3>
@@ -140,6 +141,7 @@ export default function RadiologyPage() {
             <button type="submit">Order imaging</button>
           </form>
 
+          {write && (
           <form className="card" onSubmit={(e) => saveReport(e).catch((err) => setError(err.message))}>
             <h3 style={{ marginTop: 0 }}>Dictate report</h3>
             <div className="field">
@@ -156,6 +158,7 @@ export default function RadiologyPage() {
             </div>
             <button type="submit">Finalize report</button>
           </form>
+          )}
         </div>
       )}
 
@@ -168,8 +171,8 @@ export default function RadiologyPage() {
         rowKey={(o) => o.id}
         searchPlaceholder="Search order no or study…"
         statusOptions={workflow.statuses}
-        canWrite={write}
-        renderActions={write ? (o, reload) => (
+        canWrite={canOrder || write}
+        renderActions={(canOrder || write) ? (o, reload) => (
           <>
             {workflow.next[o.status] && (
               <button type="button" className="secondary" onClick={() => advanceStatus(o, reload).catch((e) => setError(e.message))}>

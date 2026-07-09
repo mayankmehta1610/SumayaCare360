@@ -24,13 +24,16 @@ def _client_meta(request: Request):
 @router.get("/health")
 def health(db: Session = Depends(get_db)):
     import os
+    from app.db.demo_data import is_demo_complete, is_demo_loaded
     demo_patients = 0
+    data_ready = False
     try:
         tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
         if tenant:
             demo_patients = db.query(m.Patient).filter(
-                m.Patient.tenant_id == tenant.id, m.Patient.is_deleted == False
+                m.Patient.tenant_id == tenant.id, m.Patient.mrn.like("DEMO-%"), m.Patient.is_deleted == False,
             ).count()
+            data_ready = is_demo_complete(db, tenant.id) if is_demo_loaded(db, tenant.id) else demo_patients > 0
     except Exception:
         pass
     return {
@@ -39,7 +42,7 @@ def health(db: Session = Depends(get_db)):
         "time": datetime.now(timezone.utc).isoformat(),
         "build": os.getenv("RENDER_GIT_COMMIT", "local")[:8],
         "demo_patients": demo_patients,
-        "data_ready": demo_patients > 0,
+        "data_ready": data_ready,
     }
 
 
@@ -73,6 +76,9 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         "jti": str(uuid4()),
     })
     ip, ua = _client_meta(request)
+    if tenant and tenant.tenant_code == "demo":
+        from app.db.demo_data import ensure_demo_data
+        ensure_demo_data(db)
     write_audit(
         db, tenant_id=tenant.id if tenant else None, actor_user_id=user.id,
         action="LOGIN", entity_type="user", entity_id=str(user.id),
@@ -131,8 +137,11 @@ def demo_credentials(db: Session = Depends(get_db)):
 
 
 @router.get("/auth/navigation")
-def auth_navigation(ctx: AuthContext = Depends(get_current_context)):
+def auth_navigation(ctx: AuthContext = Depends(get_current_context), db: Session = Depends(get_db)):
     from app.data.role_navigation import build_navigation
+    from app.db.demo_data import ensure_demo_data
+    if ctx.tenant_code == "demo":
+        ensure_demo_data(db)
     return build_navigation(ctx.role_code, ctx.user.is_super_admin)
 
 

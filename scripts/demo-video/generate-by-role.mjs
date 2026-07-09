@@ -198,7 +198,7 @@ async function main() {
     page,
     "title",
     "SUMAYA Care 360 Role-Based Access Tour",
-    "SUMAYA Care 360 — strict role-based access demo. Each hospital role sees a different menu and different data scope. All tables load from PostgreSQL. We will log in as nine roles and show exactly what each person is allowed to see.",
+    "SUMAYA Care 360 — strict role-based access demo. Each hospital role sees a different menu with clean phase labels and role-appropriate Save buttons. All tables load from PostgreSQL. We will log in as nine roles and show exactly what each person is allowed to see.",
     titlePng,
     titleWav,
     titleSeg

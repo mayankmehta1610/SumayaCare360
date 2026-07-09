@@ -31,8 +31,14 @@ export async function apiList<T>(
   return normalizeList(data);
 }
 
-/** Load all patients for dropdowns (up to 500). */
-export async function fetchPatients(): Promise<any[]> {
-  const res = await apiList<any>("/patients", { page: 1, page_size: 500 });
+/** Load list endpoints that may return either an array or paginated payload. */
+export async function fetchListItems<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T[]> {
+  const res = await apiList<T>(path, { page: 1, page_size: 500, ...params });
   return res.items;
 }
+
+/** Load all patients for dropdowns (up to 500). */
+export async function fetchPatients(): Promise<any[]> {
+  return fetchListItems<any>("/patients");
+}
+

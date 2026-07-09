@@ -5,7 +5,7 @@ import { apiList } from "../api/list";
 import DataTable from "../components/DataTable";
 import ModuleFlowBar from "../components/ModuleFlowBar";
 import { useAuth } from "../context/AuthContext";
-import { canDelete, canWrite } from "../hooks/usePermissions";
+import { canDelete, canWriteWorkspace } from "../hooks/usePermissions";
 import { exportFromApi } from "../utils/export";
 
 type PlatformModule = {
@@ -31,7 +31,7 @@ export default function ModulePage({ moduleCode: fixedCode }: Props) {
   const { moduleCode: paramCode = "" } = useParams();
   const moduleCode = fixedCode || paramCode;
   const { session } = useAuth();
-  const write = canWrite(session);
+  const write = canWriteWorkspace(session);
   const del = canDelete(session);
 
   const [mod, setMod] = useState<PlatformModule | null>(null);
