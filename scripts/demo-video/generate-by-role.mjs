@@ -126,8 +126,20 @@ async function loginAs(page, cred) {
   await page.locator('label:has-text("Email")').locator("..").locator("input").fill(cred.email);
   await page.locator('label:has-text("Password")').locator("..").locator("input").fill(cred.password);
   await page.click('button:has-text("Sign in")');
-  await page.waitForURL(new RegExp(`/${TENANT}/(dashboard|portal|billing|pharmacy|laboratory|radiology)`), { timeout: 120000 });
-  await page.waitForTimeout(3000);
+  await page.waitForFunction(
+    () => !!localStorage.getItem("sc360_session"),
+    null,
+    { timeout: 120000 }
+  );
+  await page.waitForTimeout(2000);
+  const session = await page.evaluate(() => JSON.parse(localStorage.getItem("sc360_session") || "{}"));
+  const home = session.role_code === "PATIENT" ? "portal"
+    : session.role_code === "BILLING_STAFF" ? "billing"
+    : session.role_code === "PHARMACIST" ? "pharmacy"
+    : session.role_code === "LAB_TECH" ? "laboratory"
+    : session.role_code === "RADIOLOGIST" ? "radiology"
+    : "dashboard";
+  await gotoRetry(page, `${BASE}/${TENANT}/${home}`);
 }
 
 async function logout(page) {
