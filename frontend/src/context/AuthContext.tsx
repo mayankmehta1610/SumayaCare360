@@ -62,7 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   if (loading) {
-    return <div className="card" style={{ margin: "2rem" }}>Loading session...</div>;
+    return (
+      <div className="login-panel" style={{ minHeight: "100vh" }}>
+        <div className="card" style={{ padding: "2rem", textAlign: "center" }}>
+          <div className="kpi__icon" style={{ margin: "0 auto 1rem" }}>⋯</div>
+          Loading session…
+        </div>
+      </div>
+    );
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

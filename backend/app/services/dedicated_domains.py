@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.data.domain_lifecycles import DOMAIN_MODULES, get_domain_meta, validate_transition
 from app.models import entities as m
 from app.services.audit import write_audit
+from app.services.pagination import paginate
 
 
 def _ref_no(db: Session, tenant_id: UUID, module_code: str) -> str:
@@ -47,7 +48,27 @@ def list_records(
     submodule: Optional[str] = None,
     status: Optional[str] = None,
     query: str = "",
+    page: int = 1,
+    page_size: int = 200,
 ) -> list[m.ModuleRecord]:
+    items, _ = list_records_paginated(
+        db, tenant_id, module_code, submodule=submodule, status=status, query=query,
+        page=page, page_size=page_size,
+    )
+    return items
+
+
+def list_records_paginated(
+    db: Session,
+    tenant_id: UUID,
+    module_code: str,
+    *,
+    submodule: Optional[str] = None,
+    status: Optional[str] = None,
+    query: str = "",
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[m.ModuleRecord], int]:
     if module_code not in DOMAIN_MODULES:
         raise HTTPException(404, f"No dedicated domain config for {module_code}")
     from sqlalchemy import or_
@@ -63,7 +84,7 @@ def list_records(
     if query:
         like = f"%{query}%"
         q = q.filter(or_(m.ModuleRecord.title.ilike(like), m.ModuleRecord.reference_no.ilike(like)))
-    return q.order_by(m.ModuleRecord.created_at.desc()).limit(200).all()
+    return paginate(q.order_by(m.ModuleRecord.created_at.desc()), page, page_size)
 
 
 def create_record(
@@ -186,19 +207,21 @@ def soft_delete_record(
     )
 
 
-def export_records(rows: list[m.ModuleRecord]) -> dict:
-    return {
-        "format": "json",
-        "count": len(rows),
-        "records": [
-            {
-                "id": str(r.id),
-                "reference_no": r.reference_no,
-                "submodule": r.submodule,
-                "title": r.title,
-                "status": r.status,
-                "payload": r.payload,
-            }
-            for r in rows
-        ],
-    }
+def export_records(rows: list[m.ModuleRecord], fmt: str = "json") -> dict:
+    records = [
+        {
+            "id": str(r.id),
+            "reference_no": r.reference_no,
+            "submodule": r.submodule,
+            "title": r.title,
+            "status": r.status,
+            "payload": r.payload,
+            "patient_id": str(r.patient_id) if r.patient_id else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+    if fmt == "csv":
+        from app.services.export_util import records_to_csv
+        return {"format": "csv", "count": len(records), "csv": records_to_csv(records)}
+    return {"format": "json", "count": len(records), "records": records}

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
+import { apiList, fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
 
 type Task = {
@@ -31,9 +32,9 @@ export default function NursingPage() {
 
   async function load() {
     const [p, ipd, t] = await Promise.all([
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/clinical/ipd-admissions"),
-      api<Task[]>("/clinical/nursing-tasks"),
+      apiList<Task>("/clinical/nursing-tasks", { page: 1, page_size: 200 }).then((r) => r.items),
     ]);
     setPatients(p);
     setAdmissions(ipd.filter((a) => a.status !== "discharged"));
@@ -138,3 +139,4 @@ export default function NursingPage() {
     </div>
   );
 }
+

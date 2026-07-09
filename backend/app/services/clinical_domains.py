@@ -7,10 +7,12 @@ from typing import Any, Optional
 from uuid import UUID
 
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models import entities as m
 from app.services.audit import write_audit
+from app.services.pagination import paginate
 
 # ── Lifecycle definitions ──
 
@@ -168,14 +170,28 @@ def serialize_nursing_task(row: m.NursingTask) -> dict:
 # ── Lab orders ──
 
 def list_lab_orders(
-    db: Session, tenant_id: UUID, *, status: Optional[str] = None, patient_id: Optional[UUID] = None
+    db: Session, tenant_id: UUID, *, status: Optional[str] = None, patient_id: Optional[UUID] = None,
+    query: str = "", page: int = 1, page_size: int = 200,
 ) -> list[m.LabOrder]:
+    items, _ = list_lab_orders_paginated(
+        db, tenant_id, status=status, patient_id=patient_id, query=query, page=page, page_size=page_size,
+    )
+    return items
+
+
+def list_lab_orders_paginated(
+    db: Session, tenant_id: UUID, *, status: Optional[str] = None, patient_id: Optional[UUID] = None,
+    query: str = "", page: int = 1, page_size: int = 25,
+) -> tuple[list[m.LabOrder], int]:
     q = db.query(m.LabOrder).filter(m.LabOrder.tenant_id == tenant_id, m.LabOrder.is_deleted == False)
     if status:
         q = q.filter(m.LabOrder.status == status)
     if patient_id:
         q = q.filter(m.LabOrder.patient_id == patient_id)
-    return q.order_by(m.LabOrder.created_at.desc()).limit(200).all()
+    if query:
+        like = f"%{query}%"
+        q = q.filter(or_(m.LabOrder.order_no.ilike(like), m.LabOrder.test_code.ilike(like)))
+    return paginate(q.order_by(m.LabOrder.created_at.desc()), page, page_size)
 
 
 def get_lab_order(db: Session, tenant_id: UUID, order_id: UUID) -> m.LabOrder:
@@ -292,8 +308,19 @@ def enter_lab_results(
 # ── Radiology orders ──
 
 def list_radiology_orders(
-    db: Session, tenant_id: UUID, *, status: Optional[str] = None, patient_id: Optional[UUID] = None
+    db: Session, tenant_id: UUID, *, status: Optional[str] = None, patient_id: Optional[UUID] = None,
+    query: str = "", page: int = 1, page_size: int = 200,
 ) -> list[m.RadiologyOrder]:
+    items, _ = list_radiology_orders_paginated(
+        db, tenant_id, status=status, patient_id=patient_id, query=query, page=page, page_size=page_size,
+    )
+    return items
+
+
+def list_radiology_orders_paginated(
+    db: Session, tenant_id: UUID, *, status: Optional[str] = None, patient_id: Optional[UUID] = None,
+    query: str = "", page: int = 1, page_size: int = 25,
+) -> tuple[list[m.RadiologyOrder], int]:
     q = db.query(m.RadiologyOrder).filter(
         m.RadiologyOrder.tenant_id == tenant_id, m.RadiologyOrder.is_deleted == False
     )
@@ -301,7 +328,10 @@ def list_radiology_orders(
         q = q.filter(m.RadiologyOrder.status == status)
     if patient_id:
         q = q.filter(m.RadiologyOrder.patient_id == patient_id)
-    return q.order_by(m.RadiologyOrder.created_at.desc()).limit(200).all()
+    if query:
+        like = f"%{query}%"
+        q = q.filter(or_(m.RadiologyOrder.order_no.ilike(like), m.RadiologyOrder.study_code.ilike(like)))
+    return paginate(q.order_by(m.RadiologyOrder.created_at.desc()), page, page_size)
 
 
 def get_radiology_order(db: Session, tenant_id: UUID, order_id: UUID) -> m.RadiologyOrder:
@@ -428,8 +458,19 @@ def soft_delete_radiology_order(
 # ── Pharmacy dispense ──
 
 def list_pharmacy_dispenses(
-    db: Session, tenant_id: UUID, *, status: Optional[str] = None, patient_id: Optional[UUID] = None
+    db: Session, tenant_id: UUID, *, status: Optional[str] = None, patient_id: Optional[UUID] = None,
+    query: str = "", page: int = 1, page_size: int = 200,
 ) -> list[m.PharmacyDispense]:
+    items, _ = list_pharmacy_dispenses_paginated(
+        db, tenant_id, status=status, patient_id=patient_id, query=query, page=page, page_size=page_size,
+    )
+    return items
+
+
+def list_pharmacy_dispenses_paginated(
+    db: Session, tenant_id: UUID, *, status: Optional[str] = None, patient_id: Optional[UUID] = None,
+    query: str = "", page: int = 1, page_size: int = 25,
+) -> tuple[list[m.PharmacyDispense], int]:
     q = db.query(m.PharmacyDispense).filter(
         m.PharmacyDispense.tenant_id == tenant_id, m.PharmacyDispense.is_deleted == False
     )
@@ -437,7 +478,10 @@ def list_pharmacy_dispenses(
         q = q.filter(m.PharmacyDispense.status == status)
     if patient_id:
         q = q.filter(m.PharmacyDispense.patient_id == patient_id)
-    return q.order_by(m.PharmacyDispense.created_at.desc()).limit(200).all()
+    if query:
+        like = f"%{query}%"
+        q = q.filter(or_(m.PharmacyDispense.dispense_no.ilike(like), m.PharmacyDispense.medicine_code.ilike(like)))
+    return paginate(q.order_by(m.PharmacyDispense.created_at.desc()), page, page_size)
 
 
 def get_pharmacy_dispense(db: Session, tenant_id: UUID, dispense_id: UUID) -> m.PharmacyDispense:
@@ -605,7 +649,28 @@ def list_nursing_tasks(
     status: Optional[str] = None,
     patient_id: Optional[UUID] = None,
     admission_id: Optional[UUID] = None,
+    query: str = "",
+    page: int = 1,
+    page_size: int = 200,
 ) -> list[m.NursingTask]:
+    items, _ = list_nursing_tasks_paginated(
+        db, tenant_id, status=status, patient_id=patient_id, admission_id=admission_id,
+        query=query, page=page, page_size=page_size,
+    )
+    return items
+
+
+def list_nursing_tasks_paginated(
+    db: Session,
+    tenant_id: UUID,
+    *,
+    status: Optional[str] = None,
+    patient_id: Optional[UUID] = None,
+    admission_id: Optional[UUID] = None,
+    query: str = "",
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[m.NursingTask], int]:
     q = db.query(m.NursingTask).filter(
         m.NursingTask.tenant_id == tenant_id, m.NursingTask.is_deleted == False
     )
@@ -615,7 +680,10 @@ def list_nursing_tasks(
         q = q.filter(m.NursingTask.patient_id == patient_id)
     if admission_id:
         q = q.filter(m.NursingTask.admission_id == admission_id)
-    return q.order_by(m.NursingTask.due_at.asc(), m.NursingTask.created_at.desc()).limit(200).all()
+    if query:
+        like = f"%{query}%"
+        q = q.filter(or_(m.NursingTask.task_type.ilike(like), m.NursingTask.description.ilike(like)))
+    return paginate(q.order_by(m.NursingTask.due_at.asc(), m.NursingTask.created_at.desc()), page, page_size)
 
 
 def get_nursing_task(db: Session, tenant_id: UUID, task_id: UUID) -> m.NursingTask:

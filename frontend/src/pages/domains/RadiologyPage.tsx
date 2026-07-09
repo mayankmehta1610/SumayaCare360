@@ -1,7 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
+import { fetchPatients } from "../../api/list";
+import ClinicalListDesk from "../../components/ClinicalListDesk";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
+import { useAuth } from "../../context/AuthContext";
+import { canDelete, canWrite } from "../../hooks/usePermissions";
 
 type RadOrder = {
   id: string;
@@ -19,16 +23,20 @@ const NEXT_STATUS: Record<string, string> = {
   scheduled: "acquired",
   acquired: "reported",
 };
+const STATUSES = ["ordered", "scheduled", "acquired", "reported", "critical"];
 
 export default function RadiologyPage() {
+  const { session } = useAuth();
+  const write = canWrite(session, "encounters");
+  const del = canDelete(session);
   const [patients, setPatients] = useState<any[]>([]);
-  const [orders, setOrders] = useState<RadOrder[]>([]);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ patient_id: "", study_code: STUDIES[0] });
   const [reportId, setReportId] = useState("");
   const [reportText, setReportText] = useState("");
   const [pacsLink, setPacsLink] = useState("");
+  const [deskKey, setDeskKey] = useState(0);
 
   const patientMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -36,14 +44,8 @@ export default function RadiologyPage() {
     return m;
   }, [patients]);
 
-  async function load() {
-    const [p, o] = await Promise.all([api<any[]>("/patients"), api<RadOrder[]>("/clinical/radiology-orders")]);
-    setPatients(p);
-    setOrders(o);
-  }
-
   useEffect(() => {
-    load().catch((e) => setError(e.message));
+    fetchPatients().then(setPatients).catch((e) => setError(e.message));
   }, []);
 
   async function createOrder(e: FormEvent) {
@@ -53,10 +55,10 @@ export default function RadiologyPage() {
       body: JSON.stringify({ patient_id: form.patient_id, study_code: form.study_code }),
     });
     setMsg("Imaging order created");
-    await load();
+    setDeskKey((k) => k + 1);
   }
 
-  async function advanceStatus(order: RadOrder) {
+  async function advanceStatus(order: RadOrder, reload: () => void) {
     const next = NEXT_STATUS[order.status];
     if (!next) return;
     await api(`/clinical/radiology-orders/${order.id}/status`, {
@@ -64,7 +66,7 @@ export default function RadiologyPage() {
       body: JSON.stringify({ status: next }),
     });
     setMsg(`Order ${order.order_no} → ${next}`);
-    await load();
+    reload();
   }
 
   async function saveReport(e: FormEvent) {
@@ -77,8 +79,23 @@ export default function RadiologyPage() {
     setReportId("");
     setReportText("");
     setPacsLink("");
-    await load();
+    setDeskKey((k) => k + 1);
   }
+
+  async function remove(order: RadOrder, reload: () => void) {
+    if (!confirm("Delete this order?")) return;
+    await api(`/clinical/radiology-orders/${order.id}`, { method: "DELETE" });
+    setMsg("Deleted");
+    reload();
+  }
+
+  const columns = useMemo(() => [
+    { key: "order_no", label: "Order" },
+    { key: "patient_id", label: "Patient", render: (o: RadOrder) => patientMap.get(o.patient_id) || "—" },
+    { key: "study_code", label: "Study" },
+    { key: "status", label: "Status", render: (o: RadOrder) => <span className="badge">{o.status}</span> },
+    { key: "report_text", label: "Report", render: (o: RadOrder) => o.report_text ? "Yes" : "—" },
+  ], [patientMap]);
 
   return (
     <div>
@@ -92,75 +109,68 @@ export default function RadiologyPage() {
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
 
-      <div className="grid-2">
-        <form className="card" onSubmit={(e) => createOrder(e).catch((err) => setError(err.message))}>
-          <h3 style={{ marginTop: 0 }}>New imaging order</h3>
-          <div className="field">
-            <label>Patient</label>
-            <select required value={form.patient_id} onChange={(e) => setForm({ ...form, patient_id: e.target.value })}>
-              <option value="">Select</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>{p.mrn} — {p.first_name} {p.last_name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Study</label>
-            <select value={form.study_code} onChange={(e) => setForm({ ...form, study_code: e.target.value })}>
-              {STUDIES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <button type="submit">Order imaging</button>
-        </form>
+      {write && (
+        <div className="grid-2" style={{ marginBottom: "1rem" }}>
+          <form className="card" onSubmit={(e) => createOrder(e).catch((err) => setError(err.message))}>
+            <h3 style={{ marginTop: 0 }}>New imaging order</h3>
+            <div className="field">
+              <label>Patient</label>
+              <select required value={form.patient_id} onChange={(e) => setForm({ ...form, patient_id: e.target.value })}>
+                <option value="">Select</option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.id}>{p.mrn} — {p.first_name} {p.last_name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>Study</label>
+              <select value={form.study_code} onChange={(e) => setForm({ ...form, study_code: e.target.value })}>
+                {STUDIES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <button type="submit">Order imaging</button>
+          </form>
 
-        <form className="card" onSubmit={(e) => saveReport(e).catch((err) => setError(err.message))}>
-          <h3 style={{ marginTop: 0 }}>Dictate report</h3>
-          <div className="field">
-            <label>Order (acquired)</label>
-            <select required value={reportId} onChange={(e) => setReportId(e.target.value)}>
-              <option value="">Select</option>
-              {orders.filter((o) => o.status === "acquired").map((o) => (
-                <option key={o.id} value={o.id}>{o.order_no} — {o.study_code}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Report</label>
-            <textarea rows={4} required value={reportText} onChange={(e) => setReportText(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>PACS link</label>
-            <input value={pacsLink} onChange={(e) => setPacsLink(e.target.value)} placeholder="https://pacs..." />
-          </div>
-          <button type="submit">Finalize report</button>
-        </form>
-      </div>
+          <form className="card" onSubmit={(e) => saveReport(e).catch((err) => setError(err.message))}>
+            <h3 style={{ marginTop: 0 }}>Dictate report</h3>
+            <div className="field">
+              <label>Order ID (acquired)</label>
+              <input required value={reportId} onChange={(e) => setReportId(e.target.value)} placeholder="Order UUID" />
+            </div>
+            <div className="field">
+              <label>Report</label>
+              <textarea rows={4} required value={reportText} onChange={(e) => setReportText(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>PACS link</label>
+              <input value={pacsLink} onChange={(e) => setPacsLink(e.target.value)} placeholder="https://pacs..." />
+            </div>
+            <button type="submit">Finalize report</button>
+          </form>
+        </div>
+      )}
 
-      <div className="card table-wrap" style={{ marginTop: "1rem" }}>
-        <h3 style={{ marginTop: 0 }}>Imaging orders</h3>
-        <table>
-          <thead>
-            <tr><th>Order</th><th>Patient</th><th>Study</th><th>Status</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {orders.map((o) => (
-              <tr key={o.id}>
-                <td>{o.order_no}</td>
-                <td>{patientMap.get(o.patient_id) || "—"}</td>
-                <td>{o.study_code}</td>
-                <td><span className="badge">{o.status}</span></td>
-                <td className="actions">
-                  {NEXT_STATUS[o.status] && (
-                    <button type="button" className="secondary" onClick={() => advanceStatus(o).catch((e) => setError(e.message))}>
-                      → {NEXT_STATUS[o.status]}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ClinicalListDesk<RadOrder>
+        key={deskKey}
+        title="Imaging orders"
+        listPath="/clinical/radiology-orders"
+        exportPath="/clinical/radiology-orders/export"
+        columns={columns}
+        rowKey={(o) => o.id}
+        searchPlaceholder="Search order no or study…"
+        statusOptions={STATUSES}
+        canWrite={write}
+        renderActions={write ? (o, reload) => (
+          <>
+            {NEXT_STATUS[o.status] && (
+              <button type="button" className="secondary" onClick={() => advanceStatus(o, reload).catch((e) => setError(e.message))}>
+                → {NEXT_STATUS[o.status]}
+              </button>
+            )}
+            {del && <button type="button" className="secondary" onClick={() => remove(o, reload).catch((e) => setError(e.message))}>Delete</button>}
+          </>
+        ) : undefined}
+      />
     </div>
   );
 }

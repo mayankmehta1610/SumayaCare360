@@ -231,16 +231,6 @@ export default function DemoTourPage() {
           </div>
         </div>
       </div>
-
-      <style>{`
-        .demo-tour-hero { background: linear-gradient(135deg, var(--brand-soft, #e8f5ef), #fff); }
-        .demo-tour-login { font-size: 0.9rem; margin-top: 0.5rem; }
-        .demo-tour-narration { font-size: 1.05rem; line-height: 1.6; background: var(--brand-soft, #f0faf5); padding: 1rem; border-radius: 8px; }
-        .demo-tour-progress { margin-top: 1rem; font-size: 0.9rem; }
-        .demo-tour-bar { height: 6px; background: var(--line, #ddd); border-radius: 3px; margin-top: 0.35rem; overflow: hidden; }
-        .demo-tour-bar div { height: 100%; background: var(--brand, #0B6E4F); transition: width 0.3s; }
-        .demo-tour-data ul { font-size: 0.9rem; }
-      `}</style>
     </div>
   );
 }

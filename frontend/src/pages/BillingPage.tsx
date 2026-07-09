@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { fetchPatients } from "../api/list";
 import ModuleFlowBar from "../components/ModuleFlowBar";
 
 export default function BillingPage() {
@@ -13,7 +14,7 @@ export default function BillingPage() {
 
   async function load() {
     const [p, t, i] = await Promise.all([
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/masters/tariffs"),
       api<any[]>("/billing/invoices"),
     ]);
@@ -147,3 +148,4 @@ export default function BillingPage() {
     </div>
   );
 }
+

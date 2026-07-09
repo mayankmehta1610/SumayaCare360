@@ -10,6 +10,7 @@ from app.core.deps import AuthContext, require_tenant
 from app.data.domain_lifecycles import DOMAIN_MODULES, get_domain_meta
 from app.db.session import get_db
 from app.services import dedicated_domains as dom
+from app.services.pagination import page_response
 from app.services import features as feat_svc
 
 router = APIRouter(prefix="/dedicated", tags=["dedicated-domains"])
@@ -51,12 +52,17 @@ def list_domain_records(
     submodule: Optional[str] = None,
     status: Optional[str] = None,
     query: str = "",
+    page: int = 1,
+    page_size: int = 25,
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
     code = _check_module(module_code)
-    rows = dom.list_records(db, ctx.tenant_id, code, submodule=submodule, status=status, query=query)
-    return [dom.serialize_record(r, module_code=code) for r in rows]
+    rows, total = dom.list_records_paginated(
+        db, ctx.tenant_id, code, submodule=submodule, status=status, query=query,
+        page=page, page_size=page_size,
+    )
+    return page_response([dom.serialize_record(r, module_code=code) for r in rows], total, page, page_size)
 
 
 @router.get("/{module_code}/records/{record_id}")
@@ -166,14 +172,20 @@ def reject_domain_record(
 def export_domain_records(
     module_code: str,
     submodule: Optional[str] = None,
+    format: str = Query("json", alias="format"),
+    query: str = "",
+    status: Optional[str] = None,
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
     code = _check_module(module_code)
-    rows = dom.list_records(db, ctx.tenant_id, code, submodule=submodule)
+    rows, _ = dom.list_records_paginated(
+        db, ctx.tenant_id, code, submodule=submodule, status=status, query=query,
+        page=1, page_size=10000,
+    )
     feat_svc.mark_stage_implemented(db, code, "report")
     db.commit()
-    return dom.export_records(rows)
+    return dom.export_records(rows, fmt=format)
 
 
 @router.patch("/{module_code}/records/{record_id}/status")

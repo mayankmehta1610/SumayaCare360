@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
+import { fetchPatients } from "../api/list";
 import ModuleFlowBar from "../components/ModuleFlowBar";
 import ModuleFeaturePanel from "../components/ModuleFeaturePanel";
 
@@ -20,7 +21,7 @@ export default function TelemedicinePage() {
     const [s, v, p, a] = await Promise.all([
       api<any[]>("/telemedicine/sessions"),
       api<any>("/video/providers"),
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/appointments"),
     ]);
     setSessions(s);
@@ -223,3 +224,4 @@ export default function TelemedicinePage() {
     </div>
   );
 }
+

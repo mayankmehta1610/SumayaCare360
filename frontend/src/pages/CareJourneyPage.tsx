@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { fetchPatients } from "../api/list";
 
 type Chart = {
   patient: { id: string; mrn: string; name: string };
@@ -47,7 +48,7 @@ export default function CareJourneyPage() {
 
   async function loadMasters() {
     const [p, pr, d, m] = await Promise.all([
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/providers"),
       api<any[]>("/masters/diseases"),
       api<any[]>("/masters/medicines"),
@@ -403,3 +404,4 @@ export default function CareJourneyPage() {
     </div>
   );
 }
+

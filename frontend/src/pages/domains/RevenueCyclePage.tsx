@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
+import { fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
 
 type Tab = "claims" | "preauth" | "ar" | "refunds";
@@ -19,7 +20,7 @@ export default function RevenueCyclePage() {
 
   async function loadBase() {
     const [p, py, cl, aging, inv] = await Promise.all([
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/masters/insurance-payers"),
       api<any[]>("/finance/claims"),
       api<any>("/finance/ar-aging"),
@@ -188,3 +189,4 @@ export default function RevenueCyclePage() {
     </div>
   );
 }
+

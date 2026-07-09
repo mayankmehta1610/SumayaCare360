@@ -1,5 +1,9 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
+import DataTable from "../components/DataTable";
+import { useAuth } from "../context/AuthContext";
+import { canWrite } from "../hooks/usePermissions";
+import { downloadCsv, downloadJson, rowsToCsv } from "../utils/export";
 
 const RESOURCES = [
   "countries",
@@ -42,12 +46,17 @@ const EMPTY_FORM: CreateForm = {
 };
 
 export default function MastersPage() {
+  const { session } = useAuth();
+  const write = canWrite(session, "masters");
   const [resource, setResource] = useState("specialties");
   const [rows, setRows] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_FORM);
   const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   async function loadRows(res: string) {
     const data = await api<any[]>(`/masters/${res}`);
@@ -85,6 +94,36 @@ export default function MastersPage() {
     await loadRows(resource);
   }
 
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      String(r.code || "").toLowerCase().includes(q) ||
+      String(r.name || r.label || "").toLowerCase().includes(q),
+    );
+  }, [rows, search]);
+
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize]);
+
+  const columns = useMemo(() => [
+    { key: "code", label: "Code" },
+    { key: "name", label: "Name", render: (r: any) => r.name || r.label },
+    { key: "status", label: "Status" },
+    {
+      key: "extra",
+      label: "Extra",
+      render: (r: any) => (
+        <>
+          {r.amount != null && `₹${r.amount} `}
+          {r.icd_code && `ICD ${r.icd_code} `}
+          {r.form && `${r.form} ${r.strength || ""} `}
+          {r.sample_type && `Sample: ${r.sample_type} `}
+          {r.permission && r.permission}
+        </>
+      ),
+    },
+  ], []);
+
   return (
     <div>
       <h1 className="page-title">Configuration masters</h1>
@@ -103,7 +142,7 @@ export default function MastersPage() {
           </select>
         </div>
 
-        {CREATABLE.has(resource) && (
+        {CREATABLE.has(resource) && write && (
           <div style={{ marginBottom: "1rem" }}>
             {!showCreate ? (
               <button type="button" onClick={() => setShowCreate(true)}>Add {resource}</button>
@@ -165,35 +204,22 @@ export default function MastersPage() {
           </div>
         )}
 
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Extra</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id || r.code}>
-                  <td>{r.code}</td>
-                  <td>{r.name || r.label}</td>
-                  <td>{r.status}</td>
-                  <td>
-                    {r.amount != null && `₹${r.amount}`}
-                    {r.icd_code && `ICD ${r.icd_code}`}
-                    {r.form && `${r.form} ${r.strength || ""}`}
-                    {r.sample_type && `Sample: ${r.sample_type}`}
-                    {r.permission && r.permission}
-                    {r.capabilities && JSON.stringify(r.capabilities)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          title={`${resource} (${filtered.length})`}
+          columns={columns}
+          rows={paged}
+          rowKey={(r) => r.id || r.code}
+          total={filtered.length}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+          search={search}
+          onSearchChange={(q) => { setSearch(q); setPage(1); }}
+          searchPlaceholder="Search code or name…"
+          onExportJson={() => downloadJson(filtered, `${resource}.json`)}
+          onExportCsv={() => downloadCsv(rowsToCsv(filtered), `${resource}.csv`)}
+        />
       </div>
     </div>
   );

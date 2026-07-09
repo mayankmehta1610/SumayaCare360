@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
+import { fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
 
 type Claim = {
@@ -30,7 +31,7 @@ export default function InsuranceClaimsPage() {
 
   async function load() {
     const [p, py, cl] = await Promise.all([
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/masters/insurance-payers"),
       api<Claim[]>("/finance/claims"),
     ]);
@@ -154,3 +155,4 @@ export default function InsuranceClaimsPage() {
     </div>
   );
 }
+

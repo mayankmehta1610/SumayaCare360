@@ -10,6 +10,7 @@ from app.core.deps import (
 )
 from app.services.audit import write_audit
 from app.services.care_journey import encounter_detail, discharge_encounter, patient_chart
+from app.services.pagination import paginate, page_response
 from app.schemas.schemas import *
 from app.models import entities as m
 
@@ -464,9 +465,11 @@ def list_masters(resource: str, ctx: AuthContext = Depends(require_tenant), db: 
 
 
 # ───────────────────────── Patients ─────────────────────────
-@router.get("/patients", response_model=list[PatientOut])
+@router.get("/patients")
 def search_patients(
     query: str = "",
+    page: int = 1,
+    page_size: int = 25,
     ctx: AuthContext = Depends(require_permission("patients:read")),
     db: Session = Depends(get_db),
 ):
@@ -477,7 +480,8 @@ def search_patients(
             m.Patient.first_name.ilike(like), m.Patient.last_name.ilike(like),
             m.Patient.phone.ilike(like), m.Patient.mrn.ilike(like),
         ))
-    return q.order_by(m.Patient.created_at.desc()).limit(100).all()
+    items, total = paginate(q.order_by(m.Patient.created_at.desc()), page, page_size)
+    return page_response([PatientOut.model_validate(r) for r in items], total, page, page_size)
 
 
 @router.post("/patients", response_model=PatientOut)

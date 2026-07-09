@@ -16,6 +16,7 @@ router = APIRouter(tags=["features"])
 class ReportRunRequest(BaseModel):
     date_from: Optional[str] = None
     date_to: Optional[str] = None
+    format: Optional[str] = "json"
 
 
 @router.get("/platform/features/coverage")
@@ -72,6 +73,7 @@ def execute_report(
     return run_report(
         db, ctx.tenant_id, report_code,
         date_from=payload.date_from, date_to=payload.date_to,
+        export_format=payload.format or "json",
     )
 
 

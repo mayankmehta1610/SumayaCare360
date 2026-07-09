@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { apiList, fetchPatients } from "../api/list";
 import { useAuth } from "../context/AuthContext";
 import ModuleFlowBar from "../components/ModuleFlowBar";
 
@@ -22,11 +23,11 @@ export default function ClinicalHubPage() {
 
   async function load() {
     const [p, t, b, py, lo, ip, cl] = await Promise.all([
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/masters/lab-tests"),
       api<any[]>("/admin/beds"),
       api<any[]>("/masters/insurance-payers"),
-      api<any[]>("/clinical/lab-orders"),
+      apiList<any>("/clinical/lab-orders", { page: 1, page_size: 200 }).then((r) => r.items),
       api<any[]>("/clinical/ipd-admissions"),
       api<any[]>("/finance/claims"),
     ]);
@@ -186,3 +187,4 @@ export default function ClinicalHubPage() {
     </div>
   );
 }
+

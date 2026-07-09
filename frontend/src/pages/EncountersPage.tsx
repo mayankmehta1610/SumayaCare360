@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { fetchPatients } from "../api/list";
 
 type EncounterDetail = {
   id: string;
@@ -37,7 +38,7 @@ export default function EncountersPage() {
   async function loadList() {
     const [e, p, pr, d, m] = await Promise.all([
       api<any[]>("/encounters"),
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/providers"),
       api<any[]>("/masters/diseases"),
       api<any[]>("/masters/medicines"),
@@ -261,3 +262,4 @@ export default function EncountersPage() {
     </div>
   );
 }
+

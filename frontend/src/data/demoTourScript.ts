@@ -28,8 +28,8 @@ export const DEMO_TOUR_STEPS: DemoTourStep[] = [
     durationSec: 45,
     narration:
       "Welcome to SUMAYA Care 360, a multi-tenant hospital, clinic, and telemedicine platform. " +
-      "This guided demo shows how all thirty-six modules connect in ten logical phases. " +
-      "Every dropdown, tariff, and workflow loads from PostgreSQL — there is no hard-coded dummy data in the UI. " +
+      "Notice the modern clinical interface — deep navy sidebar with teal accents, Lucide icons on every module, and a split-screen login. " +
+      "This guided demo shows how all thirty-six modules connect in ten logical phases with full create, edit, delete, search, pagination, and export on every desk. " +
       "Use tenant code demo, email admin at demo dot sumaya, and password Tenant Admin at three sixty to sign in.",
     navigate: ["Open the login page", "Enter tenant code: demo", "Sign in with admin credentials"],
     enterData: [],
@@ -43,9 +43,10 @@ export const DEMO_TOUR_STEPS: DemoTourStep[] = [
     route: "/dashboard",
     durationSec: 50,
     narration:
-      "The dashboard shows live KPIs from PostgreSQL. You should see nine demo patients, appointments, lab orders, triage cases, and forty-eight module work items. " +
-      "If counts are low, click Load demo data now — this replays the full dataset: eight patients DEMO dash zero zero one through zero zero eight, clinical transactions, and records for every module. " +
-      "Notice the Excel feature coverage percentage — three thousand two hundred ten requirements tracked in the database.",
+      "The operations dashboard shows live KPIs with icon cards — patients, appointments, encounters, and more. " +
+      "Each metric is clickable for drill-down. The care journey hero card launches the end-to-end clinical pipeline. " +
+      "If counts are low, click Load demo data now — this replays eight patients, clinical transactions, and records for every module. " +
+      "Module phase cards below use the new sidebar icon set for quick navigation across all ten phases.",
     navigate: ["Go to Dashboard from the sidebar", "Click any KPI tile to drill down", "Use Load demo data if patients count is below five"],
     enterData: ["Click Load demo data now if prompted"],
     demoData: [
@@ -76,8 +77,9 @@ export const DEMO_TOUR_STEPS: DemoTourStep[] = [
     route: "/masters",
     durationSec: 40,
     narration:
-      "Masters is the foundation. Tariffs, medicines, lab tests, specialties, insurance payers, and notification templates all come from PostgreSQL. " +
-      "When you create an invoice or prescription, you select from these masters — never from hard-coded lists.",
+      "Masters is the foundation with search, pagination, and CSV or JSON export on every table. " +
+      "Tariffs, medicines, lab tests, specialties, insurance payers, and notification templates all come from PostgreSQL. " +
+      "Tenant admins see Add buttons to create new masters — role-based permissions hide write actions for read-only users.",
     navigate: ["Overview → Masters", "Browse tariffs, medicines, lab tests tabs"],
     enterData: ["Add a new tariff or medicine if testing create flows"],
     demoData: ["OPD_CONSULT ₹500", "TELE_CONSULT ₹400", "LAB_CBC ₹350", "PARA500 and AMOX250 medicines"],
@@ -145,9 +147,9 @@ export const DEMO_TOUR_STEPS: DemoTourStep[] = [
     route: "/patients",
     durationSec: 45,
     narration:
-      "Register and search patients. Demo patients DEMO dash zero zero one through zero zero eight are pre-loaded with demographics and phone numbers. " +
-      "Select a patient to view their chart — appointments, encounters, invoices, and lab orders in one panel. " +
-      "Create a new patient: enter first name, last name, phone, gender from master, and date of birth. MRN is auto-generated.",
+      "Patient registration uses the new data table with search, pagination, export, and role-based create. " +
+      "Demo patients DEMO dash zero zero one through zero zero eight are pre-loaded. Select Chart on any row for the patient three-sixty view. " +
+      "Register new patients with first name, last name, phone, gender from master, and date of birth — MRN auto-generates.",
     navigate: ["Front office → Patients", "Search by name or MRN", "Click row to open chart", "Use create form for new registration"],
     enterData: ["First name, last name, phone, gender, date of birth"],
     demoData: ["Rajesh Kumar DEMO-001 — fever case", "Priya Sharma DEMO-002 — telemedicine", "Ananya Reddy DEMO-006 — pediatric"],
@@ -245,8 +247,9 @@ export const DEMO_TOUR_STEPS: DemoTourStep[] = [
     route: "/laboratory",
     durationSec: 40,
     narration:
-      "Lab orders move through ordered, sample collected, result entered, verified, and critical alert. " +
-      "Demo has five CBC orders including one critical alert. Create order: pick patient, test code CBC from master, advance status.",
+      "Lab orders use the clinical desk with searchable paginated table, status filters, and export. " +
+      "Orders move through ordered, sample collected, result entered, verified, and critical alert. " +
+      "Create a new order from the form, advance status with workflow buttons, and export all orders to CSV for reporting.",
     navigate: ["Clinical hub or Laboratory", "Create lab order", "Enter result → verify or flag critical"],
     enterData: ["Patient, test code CBC", "Result value e.g. 12.5 g/dL", "Result notes"],
     demoData: ["LAB-000001 through LAB-000005", "Critical alert on LAB-000005 low hemoglobin"],
@@ -455,7 +458,9 @@ export const DEMO_TOUR_STEPS: DemoTourStep[] = [
     route: "/reports",
     durationSec: 40,
     narration:
-      "Click any report card to run live metrics from PostgreSQL — OPD dashboard, IPD occupancy, lab TAT, revenue, audit trail, executive summary. Set date filters then run. Drill-down links jump to source modules.",
+      "Reports run live metrics with date filters, detail rows, and export to JSON or CSV. " +
+      "Click any report card for OPD dashboard, IPD occupancy, lab turnaround, revenue, audit trail, or executive summary. " +
+      "The results panel shows KPIs plus paginated detail rows — perfect for hospital operations review meetings.",
     navigate: ["Open Reports", "Click report card to run", "Review metrics table", "Drill-down to module"],
     enterData: ["Optional date from and date to filters"],
     demoData: ["Reports pull live counts from demo dataset", "Workflow definitions shown below"],
@@ -481,8 +486,9 @@ export const DEMO_TOUR_STEPS: DemoTourStep[] = [
     route: "/dashboard",
     durationSec: 55,
     narration:
-      "You have toured SUMAYA Care 360 across ten phases and thirty-six modules. Data is organized by tenant and branch in PostgreSQL: patients and encounters in clinical tables, orders in lab and radiology, finance in invoices and claims, and cross-cutting workflows in module records. " +
-      "Demo replay loads eight patients, full clinical pipelines, and forty-eight domain work items. Re-run Load demo data anytime from the dashboard. Thank you for watching this SUMAYA Care 360 demonstration.",
+      "You have toured SUMAYA Care 360 across ten phases and thirty-six modules with the new clinical theme, icon navigation, and full CRUD desks. " +
+      "Every table supports search, pagination, and export. Data lives in PostgreSQL by tenant and branch. " +
+      "Demo replay loads eight patients and full clinical pipelines — click Load demo data on the dashboard anytime. Thank you for watching SUMAYA Care 360.",
     navigate: ["Return to Dashboard", "Explore any module again", "Share login: demo tenant, admin at demo dot sumaya"],
     enterData: [],
     demoData: [

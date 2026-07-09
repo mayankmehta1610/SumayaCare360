@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import DataTable from "../components/DataTable";
 import { MODULE_CATALOG } from "../data/moduleCatalog";
+import { downloadCsv, downloadJson, rowsToCsv } from "../utils/export";
 
 const MODULE_ROUTES = Object.fromEntries(MODULE_CATALOG.map((m) => [m.code, m.route]));
 
@@ -9,6 +11,9 @@ type ReportResult = {
   code: string;
   name: string;
   metrics: Record<string, unknown>;
+  rows: Record<string, unknown>[];
+  row_count: number;
+  csv?: string;
 };
 
 export default function ReportsPage() {
@@ -21,6 +26,8 @@ export default function ReportsPage() {
   const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rowPage, setRowPage] = useState(1);
+  const rowPageSize = 25;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,6 +47,7 @@ export default function ReportsPage() {
   async function runReport(code: string) {
     setLoading(true);
     setError("");
+    setRowPage(1);
     try {
       const res = await api<ReportResult>(`/platform/reports/${code}/run`, {
         method: "POST",
@@ -53,6 +61,20 @@ export default function ReportsPage() {
       setLoading(false);
     }
   }
+
+  function exportReport(fmt: "json" | "csv") {
+    if (!result) return;
+    const base = `report-${result.code}`;
+    if (fmt === "csv") {
+      const csv = result.csv || rowsToCsv(result.rows);
+      downloadCsv(csv, `${base}.csv`);
+    } else {
+      downloadJson({ metrics: result.metrics, rows: result.rows }, `${base}.json`);
+    }
+  }
+
+  const pagedRows = result?.rows?.slice((rowPage - 1) * rowPageSize, rowPage * rowPageSize) ?? [];
+  const rowCols = result?.rows?.[0] ? Object.keys(result.rows[0]).map((k) => ({ key: k, label: k })) : [];
 
   return (
     <div>
@@ -97,18 +119,40 @@ export default function ReportsPage() {
       </div>
       {loading && <p className="muted">Running report…</p>}
       {result && (
-        <div className="card" style={{ marginTop: "1rem" }}>
-          <h3 style={{ marginTop: 0 }}>{result.name} — live metrics</h3>
-          <table>
-            <tbody>
-              {Object.entries(result.metrics).map(([k, v]) => (
-                <tr key={k}><td><strong>{k}</strong></td><td>{typeof v === "object" ? JSON.stringify(v) : String(v)}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="card" style={{ marginTop: "1rem" }}>
+            <div className="actions" style={{ justifyContent: "space-between", marginBottom: "0.75rem" }}>
+              <h3 style={{ margin: 0 }}>{result.name} — live metrics</h3>
+              <div className="actions">
+                <button type="button" className="secondary" onClick={() => exportReport("json")}>Export JSON</button>
+                <button type="button" className="secondary" onClick={() => exportReport("csv")}>Export CSV</button>
+              </div>
+            </div>
+            <table>
+              <tbody>
+                {Object.entries(result.metrics).map(([k, v]) => (
+                  <tr key={k}><td><strong>{k}</strong></td><td>{typeof v === "object" ? JSON.stringify(v) : String(v)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {result.rows.length > 0 && (
+            <DataTable
+              title={`Detail rows (${result.row_count})`}
+              columns={rowCols}
+              rows={pagedRows}
+              rowKey={(r) => String(r.id ?? r.order_no ?? JSON.stringify(r))}
+              total={result.rows.length}
+              page={rowPage}
+              pageSize={rowPageSize}
+              onPageChange={setRowPage}
+              search=""
+              onSearchChange={() => {}}
+            />
+          )}
+        </>
       )}
-      <div className="card">
+      <div className="card" style={{ marginTop: "1rem" }}>
         <h3 style={{ marginTop: 0 }}>Workflow definitions (database-driven)</h3>
         <table>
           <thead><tr><th>Workflow</th><th>Module</th><th>Steps</th></tr></thead>

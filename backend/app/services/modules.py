@@ -5,6 +5,7 @@ from sqlalchemy import or_
 from app.models import entities as m
 from app.services.audit import write_audit
 from app.services.workflow_engine import validate_transition
+from app.services.pagination import paginate
 from app.data.module_catalog import MODULE_CATALOG, DEFAULT_STATUSES, DEFAULT_RECORD_FIELDS
 
 
@@ -53,6 +54,23 @@ def list_records(
     submodule: Optional[str] = None,
     limit: int = 200,
 ) -> list[m.ModuleRecord]:
+    items, _ = list_records_paginated(
+        db, tenant_id, module_code, query=query, status=status, submodule=submodule,
+        page=1, page_size=limit,
+    )
+    return items
+
+
+def list_records_paginated(
+    db: Session,
+    tenant_id: UUID,
+    module_code: str,
+    query: str = "",
+    status: Optional[str] = None,
+    submodule: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[m.ModuleRecord], int]:
     q = db.query(m.ModuleRecord).filter(
         m.ModuleRecord.tenant_id == tenant_id,
         m.ModuleRecord.module_code == module_code,
@@ -65,7 +83,8 @@ def list_records(
     if query:
         like = f"%{query}%"
         q = q.filter(or_(m.ModuleRecord.title.ilike(like), m.ModuleRecord.reference_no.ilike(like)))
-    return q.order_by(m.ModuleRecord.created_at.desc()).limit(limit).all()
+    q = q.order_by(m.ModuleRecord.created_at.desc())
+    return paginate(q, page, page_size)
 
 
 def create_record(
@@ -177,19 +196,21 @@ def soft_delete_record(
     )
 
 
-def export_records(rows: list[m.ModuleRecord]) -> dict:
-    return {
-        "format": "json",
-        "count": len(rows),
-        "records": [
-            {
-                "id": str(r.id),
-                "reference_no": r.reference_no,
-                "submodule": r.submodule,
-                "title": r.title,
-                "status": r.status,
-                "payload": r.payload,
-            }
-            for r in rows
-        ],
-    }
+def export_records(rows: list[m.ModuleRecord], fmt: str = "json") -> dict:
+    records = [
+        {
+            "id": str(r.id),
+            "reference_no": r.reference_no,
+            "submodule": r.submodule,
+            "title": r.title,
+            "status": r.status,
+            "payload": r.payload,
+            "patient_id": str(r.patient_id) if r.patient_id else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+    if fmt == "csv":
+        from app.services.export_util import records_to_csv
+        return {"format": "csv", "count": len(records), "csv": records_to_csv(records)}
+    return {"format": "json", "count": len(records), "records": records}

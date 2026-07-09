@@ -1,8 +1,12 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { apiList } from "../api/list";
+import DataTable from "../components/DataTable";
 import { useAuth } from "../context/AuthContext";
 import ModuleFlowBar from "../components/ModuleFlowBar";
+import { canWrite } from "../hooks/usePermissions";
+import { downloadCsv, downloadJson, rowsToCsv } from "../utils/export";
 
 type Patient = {
   id: string;
@@ -24,13 +28,18 @@ type Chart = {
 
 export default function PatientsPage() {
   const { session } = useAuth();
+  const write = canWrite(session, "patients");
   const prefix = session?.tenant_code ? `/${session.tenant_code}` : "";
   const [rows, setRows] = useState<Patient[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [selectedId, setSelectedId] = useState("");
   const [chart, setChart] = useState<Chart | null>(null);
   const [query, setQuery] = useState("");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -40,17 +49,27 @@ export default function PatientsPage() {
   });
   const [genders, setGenders] = useState<{ code: string; name: string }[]>([]);
 
-  async function load(q = query) {
-    const data = await api<Patient[]>(`/patients?query=${encodeURIComponent(q)}`);
-    setRows(data);
-  }
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiList<Patient>("/patients", { query, page, page_size: pageSize });
+      setRows(res.items);
+      setTotal(res.total);
+    } finally {
+      setLoading(false);
+    }
+  }, [query, page, pageSize]);
 
   useEffect(() => {
     load().catch((e) => setError(e.message));
     api<{ code: string; name: string }[]>("/masters/genders")
       .then(setGenders)
       .catch(() => setGenders([]));
-  }, []);
+  }, [load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -77,6 +96,13 @@ export default function PatientsPage() {
     }
   }
 
+  const columns = [
+    { key: "mrn", label: "MRN" },
+    { key: "name", label: "Name", render: (r: Patient) => `${r.first_name} ${r.last_name}` },
+    { key: "phone", label: "Phone" },
+    { key: "status", label: "Status", render: (r: Patient) => <span className="badge">{r.status}</span> },
+  ];
+
   return (
     <div>
       <ModuleFlowBar moduleCode="patient-registration-and-crm" compact />
@@ -85,65 +111,44 @@ export default function PatientsPage() {
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
       <div className="grid-2" style={{ marginBottom: "1rem" }}>
-        <form className="card" onSubmit={onCreate}>
-          <h3 style={{ marginTop: 0 }}>Register patient</h3>
-          <div className="grid-2">
-            <div className="field">
-              <label>First name</label>
-              <input required value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
+        {write && (
+          <form className="card" onSubmit={onCreate}>
+            <h3 style={{ marginTop: 0 }}>Register patient</h3>
+            <div className="grid-2">
+              <div className="field">
+                <label>First name</label>
+                <input required value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Last name</label>
+                <input required value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label>Phone</label>
+                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Gender</label>
+                <select value={form.gender_code} onChange={(e) => setForm({ ...form, gender_code: e.target.value })}>
+                  <option value="">Select</option>
+                  {genders.map((g) => (
+                    <option key={g.code} value={g.code}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="field">
-              <label>Last name</label>
-              <input required value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+              <label>Date of birth</label>
+              <input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
             </div>
-          </div>
-          <div className="grid-2">
-            <div className="field">
-              <label>Phone</label>
-              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-            </div>
-            <div className="field">
-              <label>Gender</label>
-              <select value={form.gender_code} onChange={(e) => setForm({ ...form, gender_code: e.target.value })}>
-                <option value="">Select</option>
-                {genders.map((g) => (
-                  <option key={g.code} value={g.code}>{g.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="field">
-            <label>Date of birth</label>
-            <input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
-          </div>
-          <button type="submit">Create patient</button>
-        </form>
+            <button type="submit">Create patient</button>
+          </form>
+        )}
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Search & interconnect</h3>
-          <div className="actions" style={{ marginBottom: "0.8rem" }}>
-            <input placeholder="Name, phone, MRN" value={query} onChange={(e) => setQuery(e.target.value)} />
-            <button type="button" onClick={() => load().catch((e) => setError(e.message))}>Search</button>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr><th>MRN</th><th>Name</th><th></th></tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} style={{ background: selectedId === r.id ? "var(--brand-soft)" : undefined }}>
-                    <td>{r.mrn}</td>
-                    <td>{r.first_name} {r.last_name}</td>
-                    <td>
-                      <button type="button" className="secondary" onClick={() => setSelectedId(r.id)}>Chart</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
           {chart && selectedId && (
-            <div style={{ marginTop: "1rem", borderTop: "1px solid var(--line)", paddingTop: "1rem" }}>
+            <div style={{ marginBottom: "1rem" }}>
               <h4>Patient 360° chart</h4>
               <p className="muted">
                 {chart.appointments.length} appts · {chart.encounters.length} encounters · {chart.invoices.length} bills · {chart.lab_orders?.length || 0} labs
@@ -158,6 +163,29 @@ export default function PatientsPage() {
           )}
         </div>
       </div>
+
+      <DataTable
+        title="Patients"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+        search={query}
+        onSearchChange={setQuery}
+        searchPlaceholder="Name, phone, MRN…"
+        loading={loading}
+        onExportJson={() => downloadJson(rows, "patients.json")}
+        onExportCsv={() => downloadCsv(rowsToCsv(rows as unknown as Record<string, unknown>[]), "patients.csv")}
+        renderActions={(r) => (
+          <button type="button" className={selectedId === r.id ? "" : "secondary"} onClick={() => setSelectedId(r.id)}>
+            Chart
+          </button>
+        )}
+      />
     </div>
   );
 }

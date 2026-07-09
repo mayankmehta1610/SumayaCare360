@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
+import { fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
 
 type LocEvent = {
@@ -23,7 +24,7 @@ export default function LocationServicesPage() {
 
   async function load() {
     const [p, pu, ev] = await Promise.all([
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/masters/location-purposes"),
       api<LocEvent[]>("/location/events"),
     ]);
@@ -112,3 +113,4 @@ export default function LocationServicesPage() {
     </div>
   );
 }
+

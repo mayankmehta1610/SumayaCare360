@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
+import { fetchPatients } from "../api/list";
 import ModuleFlowBar from "../components/ModuleFlowBar";
 
 export default function AppointmentsPage() {
@@ -22,7 +23,7 @@ export default function AppointmentsPage() {
   async function load() {
     const [a, p, pr] = await Promise.all([
       api<any[]>("/appointments"),
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/providers"),
     ]);
     setRows(a);
@@ -164,3 +165,4 @@ export default function AppointmentsPage() {
     </div>
   );
 }
+

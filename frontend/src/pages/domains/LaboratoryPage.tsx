@@ -1,7 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
+import { fetchPatients } from "../../api/list";
+import ClinicalListDesk from "../../components/ClinicalListDesk";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
+import { useAuth } from "../../context/AuthContext";
+import { canWrite } from "../../hooks/usePermissions";
 
 type LabOrder = {
   id: string;
@@ -20,14 +24,18 @@ const NEXT_STATUS: Record<string, string> = {
   result_entered: "verified",
 };
 
+const STATUSES = ["ordered", "sample_collected", "result_entered", "verified", "critical_alert"];
+
 export default function LaboratoryPage() {
+  const { session } = useAuth();
+  const write = canWrite(session, "encounters");
   const [patients, setPatients] = useState<any[]>([]);
   const [tests, setTests] = useState<any[]>([]);
-  const [orders, setOrders] = useState<LabOrder[]>([]);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ patient_id: "", test_code: "" });
   const [resultForm, setResultForm] = useState({ orderId: "", result_value: "", result_notes: "", critical_flag: false });
+  const [deskKey, setDeskKey] = useState(0);
 
   const patientMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -35,19 +43,10 @@ export default function LaboratoryPage() {
     return m;
   }, [patients]);
 
-  async function load() {
-    const [p, t, o] = await Promise.all([
-      api<any[]>("/patients"),
-      api<any[]>("/masters/lab-tests"),
-      api<LabOrder[]>("/clinical/lab-orders"),
-    ]);
-    setPatients(p);
-    setTests(t);
-    setOrders(o);
-  }
-
   useEffect(() => {
-    load().catch((e) => setError(e.message));
+    Promise.all([fetchPatients(), api<any[]>("/masters/lab-tests")])
+      .then(([p, t]) => { setPatients(p); setTests(t); })
+      .catch((e) => setError(e.message));
   }, []);
 
   async function createOrder(e: FormEvent) {
@@ -58,15 +57,15 @@ export default function LaboratoryPage() {
     });
     setMsg("Lab order created");
     setForm({ patient_id: "", test_code: "" });
-    await load();
+    setDeskKey((k) => k + 1);
   }
 
-  async function advanceStatus(order: LabOrder) {
+  async function advanceStatus(order: LabOrder, reload: () => void) {
     const next = NEXT_STATUS[order.status];
     if (!next) return;
     await api(`/clinical/lab-orders/${order.id}/status?status=${next}`, { method: "PATCH" });
     setMsg(`Order ${order.order_no} → ${next}`);
-    await load();
+    reload();
   }
 
   async function saveResult(e: FormEvent) {
@@ -82,10 +81,16 @@ export default function LaboratoryPage() {
     });
     setMsg("Results entered");
     setResultForm({ orderId: "", result_value: "", result_notes: "", critical_flag: false });
-    await load();
+    setDeskKey((k) => k + 1);
   }
 
-  const active = orders.filter((o) => !["verified", "critical_alert"].includes(o.status));
+  const columns = useMemo(() => [
+    { key: "order_no", label: "Order" },
+    { key: "patient_id", label: "Patient", render: (o: LabOrder) => patientMap.get(o.patient_id) || "—" },
+    { key: "test_code", label: "Test" },
+    { key: "status", label: "Status", render: (o: LabOrder) => <span className="badge">{o.status}</span> },
+    { key: "result_value", label: "Result", render: (o: LabOrder) => o.result_value || "—" },
+  ], [patientMap]);
 
   return (
     <div>
@@ -100,87 +105,77 @@ export default function LaboratoryPage() {
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
 
-      <div className="grid-2">
-        <form className="card" onSubmit={(e) => createOrder(e).catch((err) => setError(err.message))}>
-          <h3 style={{ marginTop: 0 }}>New lab order</h3>
-          <div className="field">
-            <label>Patient</label>
-            <select required value={form.patient_id} onChange={(e) => setForm({ ...form, patient_id: e.target.value })}>
-              <option value="">Select</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>{p.mrn} — {p.first_name} {p.last_name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Test (master)</label>
-            <select required value={form.test_code} onChange={(e) => setForm({ ...form, test_code: e.target.value })}>
-              <option value="">Select</option>
-              {tests.map((t) => (
-                <option key={t.code} value={t.code}>{t.name} ({t.code})</option>
-              ))}
-            </select>
-          </div>
-          <button type="submit">Order test</button>
-        </form>
+      {write && (
+        <div className="grid-2" style={{ marginBottom: "1rem" }}>
+          <form className="card" onSubmit={(e) => createOrder(e).catch((err) => setError(err.message))}>
+            <h3 style={{ marginTop: 0 }}>New lab order</h3>
+            <div className="field">
+              <label>Patient</label>
+              <select required value={form.patient_id} onChange={(e) => setForm({ ...form, patient_id: e.target.value })}>
+                <option value="">Select</option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.id}>{p.mrn} — {p.first_name} {p.last_name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>Test (master)</label>
+              <select required value={form.test_code} onChange={(e) => setForm({ ...form, test_code: e.target.value })}>
+                <option value="">Select</option>
+                {tests.map((t) => (
+                  <option key={t.code} value={t.code}>{t.name} ({t.code})</option>
+                ))}
+              </select>
+            </div>
+            <button type="submit">Order test</button>
+          </form>
 
-        <form className="card" onSubmit={(e) => saveResult(e).catch((err) => setError(err.message))}>
-          <h3 style={{ marginTop: 0 }}>Result entry</h3>
-          <div className="field">
-            <label>Order (sample collected)</label>
-            <select
-              required
-              value={resultForm.orderId}
-              onChange={(e) => setResultForm({ ...resultForm, orderId: e.target.value })}
-            >
-              <option value="">Select</option>
-              {orders.filter((o) => o.status === "sample_collected").map((o) => (
-                <option key={o.id} value={o.id}>{o.order_no} — {o.test_code}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Result value</label>
-            <input required value={resultForm.result_value} onChange={(e) => setResultForm({ ...resultForm, result_value: e.target.value })} />
-          </div>
-          <div className="field">
-            <label>Notes</label>
-            <textarea rows={2} value={resultForm.result_notes} onChange={(e) => setResultForm({ ...resultForm, result_notes: e.target.value })} />
-          </div>
-          <label style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.75rem" }}>
-            <input type="checkbox" checked={resultForm.critical_flag} onChange={(e) => setResultForm({ ...resultForm, critical_flag: e.target.checked })} />
-            Critical result
-          </label>
-          <button type="submit">Enter results</button>
-        </form>
-      </div>
+          <form className="card" onSubmit={(e) => saveResult(e).catch((err) => setError(err.message))}>
+            <h3 style={{ marginTop: 0 }}>Result entry</h3>
+            <div className="field">
+              <label>Order ID (sample collected)</label>
+              <input
+                required
+                placeholder="Paste order UUID"
+                value={resultForm.orderId}
+                onChange={(e) => setResultForm({ ...resultForm, orderId: e.target.value })}
+              />
+            </div>
+            <div className="field">
+              <label>Result value</label>
+              <input required value={resultForm.result_value} onChange={(e) => setResultForm({ ...resultForm, result_value: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>Notes</label>
+              <textarea rows={2} value={resultForm.result_notes} onChange={(e) => setResultForm({ ...resultForm, result_notes: e.target.value })} />
+            </div>
+            <label style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.75rem" }}>
+              <input type="checkbox" checked={resultForm.critical_flag} onChange={(e) => setResultForm({ ...resultForm, critical_flag: e.target.checked })} />
+              Critical result
+            </label>
+            <button type="submit">Enter results</button>
+          </form>
+        </div>
+      )}
 
-      <div className="card table-wrap" style={{ marginTop: "1rem" }}>
-        <h3 style={{ marginTop: 0 }}>Lab orders ({active.length} active)</h3>
-        <table>
-          <thead>
-            <tr><th>Order</th><th>Patient</th><th>Test</th><th>Status</th><th>Result</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {orders.map((o) => (
-              <tr key={o.id}>
-                <td>{o.order_no}</td>
-                <td>{patientMap.get(o.patient_id) || "—"}</td>
-                <td>{o.test_code}</td>
-                <td><span className="badge">{o.status}</span></td>
-                <td>{o.result_value || "—"}</td>
-                <td className="actions">
-                  {NEXT_STATUS[o.status] && (
-                    <button type="button" className="secondary" onClick={() => advanceStatus(o).catch((e) => setError(e.message))}>
-                      → {NEXT_STATUS[o.status]}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ClinicalListDesk<LabOrder>
+        key={deskKey}
+        title="Lab orders"
+        listPath="/clinical/lab-orders"
+        exportPath="/clinical/lab-orders/export"
+        columns={columns}
+        rowKey={(o) => o.id}
+        searchPlaceholder="Search order no or test…"
+        statusOptions={STATUSES}
+        canWrite={write}
+        renderActions={write ? (o, reload) => (
+          NEXT_STATUS[o.status] ? (
+            <button type="button" className="secondary" onClick={() => advanceStatus(o, reload).catch((e) => setError(e.message))}>
+              → {NEXT_STATUS[o.status]}
+            </button>
+          ) : null
+        ) : undefined}
+      />
     </div>
   );
 }

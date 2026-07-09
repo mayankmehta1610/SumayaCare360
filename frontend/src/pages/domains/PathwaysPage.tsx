@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
+import { fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
 
 type Template = {
@@ -33,7 +34,7 @@ export default function PathwaysPage() {
 
   async function load() {
     const [p, d, t, e] = await Promise.all([
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/masters/diseases"),
       api<Template[]>("/pathways/templates"),
       api<Enrollment[]>("/pathways/enrollments"),
@@ -164,3 +165,4 @@ export default function PathwaysPage() {
     </div>
   );
 }
+

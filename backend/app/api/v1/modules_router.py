@@ -10,6 +10,7 @@ from app.core.security import hash_password
 from app.schemas.schemas import UserCreate
 from app.models import entities as m
 from app.services import modules as mod_svc
+from app.services.pagination import paginate, page_response
 from app.services.care_journey import discharge_ipd
 from app.data.module_catalog import MODULE_CATALOG
 from app.data.slug_aliases import normalize_slug, SLUG_ALIASES
@@ -128,12 +129,16 @@ def list_module_records(
     query: str = "",
     status: Optional[str] = None,
     submodule: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 25,
     ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     module_code = _validate_module(module_code)
-    rows = mod_svc.list_records(db, ctx.tenant_id, module_code, query, status, submodule)
-    return [_serialize_record(r) for r in rows]
+    rows, total = mod_svc.list_records_paginated(
+        db, ctx.tenant_id, module_code, query, status, submodule, page, page_size,
+    )
+    return page_response([_serialize_record(r) for r in rows], total, page, page_size)
 
 
 @router.get("/modules/{module_code}/{record_id}")
@@ -268,21 +273,34 @@ def reject_module_record(
 @router.post("/modules/{module_code}/export")
 def export_module_records(
     module_code: str,
+    format: str = Query("json", alias="format"),
+    submodule: Optional[str] = None,
+    query: str = "",
+    status: Optional[str] = None,
     ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
     module_code = _validate_module(module_code)
-    rows = mod_svc.list_records(db, ctx.tenant_id, module_code)
-    return mod_svc.export_records(rows)
+    rows, _ = mod_svc.list_records_paginated(
+        db, ctx.tenant_id, module_code, query, status, submodule, page=1, page_size=10000,
+    )
+    return mod_svc.export_records(rows, fmt=format)
 
 
 @router.get("/{module_code}")
-def api_backlog_list(module_code: str, query: str = "", ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
+def api_backlog_list(
+    module_code: str,
+    query: str = "",
+    page: int = 1,
+    page_size: int = 25,
+    ctx: AuthContext = Depends(resolve_tenant_context),
+    db: Session = Depends(get_db),
+):
     if module_code in RESERVED or module_code not in MODULE_CODES:
         raise HTTPException(404, "Not found")
     canonical = normalize_slug(module_code)
-    rows = mod_svc.list_records(db, ctx.tenant_id, canonical, query)
-    return [_serialize_record(r) for r in rows]
+    rows, total = mod_svc.list_records_paginated(db, ctx.tenant_id, canonical, query, page=page, page_size=page_size)
+    return page_response([_serialize_record(r) for r in rows], total, page, page_size)
 
 
 @router.post("/{module_code}")

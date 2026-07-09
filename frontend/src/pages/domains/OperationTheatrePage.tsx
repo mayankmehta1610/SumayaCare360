@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
+import { fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
 
 type OtProc = {
@@ -35,7 +36,7 @@ export default function OperationTheatrePage() {
 
   async function load() {
     const [p, o] = await Promise.all([
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<OtProc[]>("/ot/procedures"),
     ]);
     setPatients(p);
@@ -153,3 +154,4 @@ export default function OperationTheatrePage() {
     </div>
   );
 }
+

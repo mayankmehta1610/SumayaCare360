@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
+import { fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
 
 type Admission = {
@@ -27,7 +28,7 @@ export default function InpatientPage() {
 
   async function load() {
     const [p, b, ip] = await Promise.all([
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/admin/beds"),
       api<Admission[]>("/clinical/ipd-admissions"),
     ]);
@@ -143,3 +144,4 @@ export default function InpatientPage() {
     </div>
   );
 }
+

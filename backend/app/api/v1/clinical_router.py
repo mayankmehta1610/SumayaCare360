@@ -12,6 +12,7 @@ from app.core.deps import AuthContext, require_tenant
 from app.db.session import get_db
 from app.models import entities as m
 from app.services import clinical_domains as clinical
+from app.services.pagination import page_response
 
 router = APIRouter(prefix="/clinical", tags=["clinical"])
 
@@ -90,11 +91,16 @@ class NursingTaskUpdate(BaseModel):
 def list_lab_orders(
     status: Optional[str] = None,
     patient_id: Optional[UUID] = None,
+    query: str = "",
+    page: int = 1,
+    page_size: int = 25,
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
-    rows = clinical.list_lab_orders(db, ctx.tenant_id, status=status, patient_id=patient_id)
-    return [clinical.serialize_lab_order(r) for r in rows]
+    rows, total = clinical.list_lab_orders_paginated(
+        db, ctx.tenant_id, status=status, patient_id=patient_id, query=query, page=page, page_size=page_size,
+    )
+    return page_response([clinical.serialize_lab_order(r) for r in rows], total, page, page_size)
 
 
 @router.post("/lab-orders")
@@ -170,11 +176,16 @@ def enter_lab_results(
 def list_radiology_orders(
     status: Optional[str] = None,
     patient_id: Optional[UUID] = None,
+    query: str = "",
+    page: int = 1,
+    page_size: int = 25,
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
-    rows = clinical.list_radiology_orders(db, ctx.tenant_id, status=status, patient_id=patient_id)
-    return [clinical.serialize_radiology_order(r) for r in rows]
+    rows, total = clinical.list_radiology_orders_paginated(
+        db, ctx.tenant_id, status=status, patient_id=patient_id, query=query, page=page, page_size=page_size,
+    )
+    return page_response([clinical.serialize_radiology_order(r) for r in rows], total, page, page_size)
 
 
 @router.post("/radiology-orders")
@@ -310,11 +321,16 @@ def list_prescription_queue(ctx: AuthContext = Depends(require_tenant), db: Sess
 def list_pharmacy_dispenses(
     status: Optional[str] = None,
     patient_id: Optional[UUID] = None,
+    query: str = "",
+    page: int = 1,
+    page_size: int = 25,
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
-    rows = clinical.list_pharmacy_dispenses(db, ctx.tenant_id, status=status, patient_id=patient_id)
-    return [clinical.serialize_pharmacy_dispense(r) for r in rows]
+    rows, total = clinical.list_pharmacy_dispenses_paginated(
+        db, ctx.tenant_id, status=status, patient_id=patient_id, query=query, page=page, page_size=page_size,
+    )
+    return page_response([clinical.serialize_pharmacy_dispense(r) for r in rows], total, page, page_size)
 
 
 @router.post("/pharmacy-dispenses")
@@ -393,13 +409,17 @@ def list_nursing_tasks(
     status: Optional[str] = None,
     patient_id: Optional[UUID] = None,
     admission_id: Optional[UUID] = None,
+    query: str = "",
+    page: int = 1,
+    page_size: int = 25,
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
-    rows = clinical.list_nursing_tasks(
-        db, ctx.tenant_id, status=status, patient_id=patient_id, admission_id=admission_id
+    rows, total = clinical.list_nursing_tasks_paginated(
+        db, ctx.tenant_id, status=status, patient_id=patient_id, admission_id=admission_id,
+        query=query, page=page, page_size=page_size,
     )
-    return [clinical.serialize_nursing_task(r) for r in rows]
+    return page_response([clinical.serialize_nursing_task(r) for r in rows], total, page, page_size)
 
 
 @router.post("/nursing-tasks")
@@ -482,3 +502,39 @@ def delete_nursing_task(
     clinical.soft_delete_nursing_task(db, row, ctx.user.id, correlation_id=ctx.correlation_id)
     db.commit()
     return {"deleted": True, "id": str(task_id)}
+
+
+@router.post("/lab-orders/export")
+def export_lab_orders(
+    format: str = Query("json", alias="format"),
+    status: Optional[str] = None,
+    query: str = "",
+    ctx: AuthContext = Depends(require_tenant),
+    db: Session = Depends(get_db),
+):
+    rows, _ = clinical.list_lab_orders_paginated(
+        db, ctx.tenant_id, status=status, query=query, page=1, page_size=10000,
+    )
+    records = [clinical.serialize_lab_order(r) for r in rows]
+    if format == "csv":
+        from app.services.export_util import records_to_csv
+        return {"format": "csv", "count": len(records), "csv": records_to_csv(records)}
+    return {"format": "json", "count": len(records), "records": records}
+
+
+@router.post("/radiology-orders/export")
+def export_radiology_orders(
+    format: str = Query("json", alias="format"),
+    status: Optional[str] = None,
+    query: str = "",
+    ctx: AuthContext = Depends(require_tenant),
+    db: Session = Depends(get_db),
+):
+    rows, _ = clinical.list_radiology_orders_paginated(
+        db, ctx.tenant_id, status=status, query=query, page=1, page_size=10000,
+    )
+    records = [clinical.serialize_radiology_order(r) for r in rows]
+    if format == "csv":
+        from app.services.export_util import records_to_csv
+        return {"format": "csv", "count": len(records), "csv": records_to_csv(records)}
+    return {"format": "json", "count": len(records), "records": records}

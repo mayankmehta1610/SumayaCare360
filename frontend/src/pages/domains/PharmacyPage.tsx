@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
+import { apiList, fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
 
 type RxQueue = {
@@ -38,10 +39,10 @@ export default function PharmacyPage() {
 
   async function load() {
     const [p, med, q, d] = await Promise.all([
-      api<any[]>("/patients"),
+      fetchPatients(),
       api<any[]>("/masters/medicines"),
       api<RxQueue[]>("/clinical/prescriptions"),
-      api<Dispense[]>("/clinical/pharmacy-dispenses"),
+      apiList<Dispense>("/clinical/pharmacy-dispenses", { page: 1, page_size: 200 }).then((r) => r.items),
     ]);
     setPatients(p);
     setMedicines(med);
@@ -163,3 +164,4 @@ export default function PharmacyPage() {
     </div>
   );
 }
+

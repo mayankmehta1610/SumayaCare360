@@ -108,7 +108,7 @@ async function login(page) {
   await page.locator('label:has-text("Email")').locator("..").locator("input").fill(LOGIN.email);
   await page.locator('label:has-text("Password")').locator("..").locator("input").fill(LOGIN.password);
   await page.click('button:has-text("Sign in")');
-  await page.waitForSelector("h1.page-title, h1:has-text('Operations dashboard')", { timeout: 120000 });
+  await page.waitForSelector("h1.page-title, h2:has-text('Welcome back'), .sidebar", { timeout: 120000 });
   await page.waitForTimeout(2000);
 }
 
