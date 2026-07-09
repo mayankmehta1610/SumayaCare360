@@ -17,22 +17,18 @@ type RadOrder = {
   pacs_link?: string;
 };
 
-const STUDIES = ["XRAY-CHEST", "USG-ABD", "CT-HEAD", "MRI-SPINE", "MAMMO-SCREEN"];
-const NEXT_STATUS: Record<string, string> = {
-  ordered: "scheduled",
-  scheduled: "acquired",
-  acquired: "reported",
-};
-const STATUSES = ["ordered", "scheduled", "acquired", "reported", "critical"];
+type Study = { code: string; name: string };
 
 export default function RadiologyPage() {
   const { session } = useAuth();
-  const write = canWrite(session, "encounters");
-  const del = canDelete(session);
+  const write = canWrite(session, "radiology");
+  const del = canDelete(session, "radiology");
   const [patients, setPatients] = useState<any[]>([]);
+  const [studies, setStudies] = useState<Study[]>([]);
+  const [workflow, setWorkflow] = useState<{ statuses: string[]; next: Record<string, string> }>({ statuses: [], next: {} });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
-  const [form, setForm] = useState({ patient_id: "", study_code: STUDIES[0] });
+  const [form, setForm] = useState({ patient_id: "", study_code: "" });
   const [reportId, setReportId] = useState("");
   const [reportText, setReportText] = useState("");
   const [pacsLink, setPacsLink] = useState("");
@@ -45,7 +41,18 @@ export default function RadiologyPage() {
   }, [patients]);
 
   useEffect(() => {
-    fetchPatients().then(setPatients).catch((e) => setError(e.message));
+    Promise.all([
+      fetchPatients(),
+      api<Study[]>("/clinical/radiology/studies"),
+      api<{ statuses: string[]; next: Record<string, string> }>("/clinical/radiology/workflow"),
+    ])
+      .then(([p, s, wf]) => {
+        setPatients(p);
+        setStudies(s);
+        setWorkflow(wf);
+        if (s.length > 0) setForm((f) => ({ ...f, study_code: f.study_code || s[0].code }));
+      })
+      .catch((e) => setError(e.message));
   }, []);
 
   async function createOrder(e: FormEvent) {
@@ -59,7 +66,7 @@ export default function RadiologyPage() {
   }
 
   async function advanceStatus(order: RadOrder, reload: () => void) {
-    const next = NEXT_STATUS[order.status];
+    const next = workflow.next[order.status];
     if (!next) return;
     await api(`/clinical/radiology-orders/${order.id}/status`, {
       method: "PATCH",
@@ -101,7 +108,9 @@ export default function RadiologyPage() {
     <div>
       <ModuleFlowBar moduleCode="radiology-and-imaging" compact />
       <h1 className="page-title">Radiology & imaging</h1>
-      <p className="muted">ordered → scheduled → acquired → reported / critical</p>
+      <p className="muted">
+        {workflow.statuses.length > 0 ? workflow.statuses.join(" → ") : "Loading workflow…"}
+      </p>
       <div className="actions" style={{ marginBottom: "1rem" }}>
         <Link to="/laboratory" className="secondary button-link">Laboratory</Link>
         <Link to="/pharmacy" className="secondary button-link">Pharmacy</Link>
@@ -125,7 +134,7 @@ export default function RadiologyPage() {
             <div className="field">
               <label>Study</label>
               <select value={form.study_code} onChange={(e) => setForm({ ...form, study_code: e.target.value })}>
-                {STUDIES.map((s) => <option key={s} value={s}>{s}</option>)}
+                {studies.map((s) => <option key={s.code} value={s.code}>{s.name} ({s.code})</option>)}
               </select>
             </div>
             <button type="submit">Order imaging</button>
@@ -158,13 +167,13 @@ export default function RadiologyPage() {
         columns={columns}
         rowKey={(o) => o.id}
         searchPlaceholder="Search order no or study…"
-        statusOptions={STATUSES}
+        statusOptions={workflow.statuses}
         canWrite={write}
         renderActions={write ? (o, reload) => (
           <>
-            {NEXT_STATUS[o.status] && (
+            {workflow.next[o.status] && (
               <button type="button" className="secondary" onClick={() => advanceStatus(o, reload).catch((e) => setError(e.message))}>
-                → {NEXT_STATUS[o.status]}
+                → {workflow.next[o.status]}
               </button>
             )}
             {del && <button type="button" className="secondary" onClick={() => remove(o, reload).catch((e) => setError(e.message))}>Delete</button>}

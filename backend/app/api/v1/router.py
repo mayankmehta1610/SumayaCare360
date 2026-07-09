@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from app.db.session import get_db
 from app.core.security import hash_password, verify_password, create_access_token, decode_token
 from app.core.deps import (
-    AuthContext, get_current_context, require_permission, require_tenant, permissions_for_role
+    AuthContext, get_current_context, require_permission, require_tenant, permissions_for_role, has_permission
 )
 from app.services.audit import write_audit
 from app.services.care_journey import encounter_detail, discharge_encounter, patient_chart
@@ -98,6 +98,35 @@ def me(ctx: AuthContext = Depends(get_current_context)):
         "tenant_code": ctx.tenant_code,
         "permissions": ctx.permissions,
         "is_super_admin": ctx.user.is_super_admin,
+    }
+
+
+@router.get("/auth/demo-credentials")
+def demo_credentials(db: Session = Depends(get_db)):
+    """Public demo login catalog for the demo tenant."""
+    from app.data.demo_credentials import DEMO_ROLE_USERS, DEMO_TENANT_CODE
+    tenant = db.query(m.Tenant).filter(
+        m.Tenant.tenant_code == DEMO_TENANT_CODE, m.Tenant.is_deleted == False,
+    ).first()
+    users = []
+    if tenant:
+        for email, name, role, password, description in DEMO_ROLE_USERS:
+            users.append({
+                "email": email,
+                "full_name": name,
+                "role_code": role,
+                "password": password,
+                "description": description,
+            })
+    return {
+        "tenant_code": DEMO_TENANT_CODE,
+        "super_admin": {
+            "email": "superadmin@sumayacare360.com",
+            "password": "SuperAdmin@360",
+            "role_code": "SUPER_ADMIN",
+            "description": "Platform super admin — all tenants",
+        },
+        "users": users,
     }
 
 
@@ -1348,6 +1377,7 @@ def list_notifications(
 # ───────────────────────── Dashboard KPIs ─────────────────────────
 @router.get("/dashboard/summary")
 def dashboard_summary(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+    from app.data.demo_credentials import KPI_PERMISSIONS
     patients = db.query(m.Patient).filter(m.Patient.tenant_id == ctx.tenant_id, m.Patient.is_deleted == False).count()
     appts = db.query(m.Appointment).filter(m.Appointment.tenant_id == ctx.tenant_id, m.Appointment.is_deleted == False).count()
     open_enc = db.query(m.Encounter).filter(m.Encounter.tenant_id == ctx.tenant_id, m.Encounter.status == "open").count()
@@ -1365,25 +1395,28 @@ def dashboard_summary(ctx: AuthContext = Depends(require_tenant), db: Session = 
     beds_avail = db.query(m.Bed).filter(m.Bed.tenant_id == ctx.tenant_id, m.Bed.status == "available").count()
     modules_active = db.query(m.PlatformModule).filter(m.PlatformModule.active == True).count()
     domain_records = db.query(m.ModuleRecord).filter(m.ModuleRecord.tenant_id == ctx.tenant_id).count()
-    return {
-        "kpis": [
-            {"code": "patients", "label": "Patients", "value": patients, "drilldown": "/patients"},
-            {"code": "appointments", "label": "Appointments", "value": appts, "drilldown": "/appointments"},
-            {"code": "checked_in", "label": "Checked In", "value": db.query(m.Appointment).filter(m.Appointment.tenant_id == ctx.tenant_id, m.Appointment.status == "checked_in").count(), "drilldown": "/appointments"},
-            {"code": "open_encounters", "label": "Open Encounters", "value": open_enc, "drilldown": "/encounters"},
-            {"code": "telemedicine", "label": "Tele Sessions", "value": tele, "drilldown": "/telemedicine"},
-            {"code": "triage", "label": "ED Triage", "value": triage, "drilldown": "/emergency"},
-            {"code": "ipd", "label": "IPD Active", "value": ipd, "drilldown": "/inpatient"},
-            {"code": "nursing", "label": "Nursing Tasks", "value": nursing, "drilldown": "/nursing"},
-            {"code": "ot", "label": "OT Cases", "value": ot, "drilldown": "/operation-theatre"},
-            {"code": "lab", "label": "Lab Orders", "value": lab, "drilldown": "/laboratory"},
-            {"code": "radiology", "label": "Radiology", "value": rad, "drilldown": "/radiology"},
-            {"code": "pharmacy", "label": "Pharmacy Queue", "value": rx, "drilldown": "/pharmacy"},
-            {"code": "pathways", "label": "Pathway Enrollments", "value": pathways, "drilldown": "/pathways"},
-            {"code": "claims", "label": "Insurance Claims", "value": claims, "drilldown": "/insurance-claims"},
-            {"code": "beds", "label": "Beds Available", "value": beds_avail, "drilldown": "/rooms-facilities"},
-            {"code": "invoices", "label": "Invoices", "value": invoices, "drilldown": "/billing"},
-            {"code": "domain_records", "label": "Module Work Items", "value": domain_records, "drilldown": "/module-map"},
-            {"code": "modules", "label": "Platform Modules", "value": modules_active, "drilldown": "/module-map"},
-        ]
-    }
+    all_kpis = [
+        {"code": "patients", "label": "Patients", "value": patients, "drilldown": "/patients"},
+        {"code": "appointments", "label": "Appointments", "value": appts, "drilldown": "/appointments"},
+        {"code": "checked_in", "label": "Checked In", "value": db.query(m.Appointment).filter(m.Appointment.tenant_id == ctx.tenant_id, m.Appointment.status == "checked_in").count(), "drilldown": "/appointments"},
+        {"code": "open_encounters", "label": "Open Encounters", "value": open_enc, "drilldown": "/encounters"},
+        {"code": "telemedicine", "label": "Tele Sessions", "value": tele, "drilldown": "/telemedicine"},
+        {"code": "triage", "label": "ED Triage", "value": triage, "drilldown": "/emergency"},
+        {"code": "ipd", "label": "IPD Active", "value": ipd, "drilldown": "/inpatient"},
+        {"code": "nursing", "label": "Nursing Tasks", "value": nursing, "drilldown": "/nursing"},
+        {"code": "ot", "label": "OT Cases", "value": ot, "drilldown": "/operation-theatre"},
+        {"code": "lab", "label": "Lab Orders", "value": lab, "drilldown": "/laboratory"},
+        {"code": "radiology", "label": "Radiology", "value": rad, "drilldown": "/radiology"},
+        {"code": "pharmacy", "label": "Pharmacy Queue", "value": rx, "drilldown": "/pharmacy"},
+        {"code": "pathways", "label": "Pathway Enrollments", "value": pathways, "drilldown": "/pathways"},
+        {"code": "claims", "label": "Insurance Claims", "value": claims, "drilldown": "/insurance-claims"},
+        {"code": "beds", "label": "Beds Available", "value": beds_avail, "drilldown": "/rooms-facilities"},
+        {"code": "invoices", "label": "Invoices", "value": invoices, "drilldown": "/billing"},
+        {"code": "domain_records", "label": "Module Work Items", "value": domain_records, "drilldown": "/module-map"},
+        {"code": "modules", "label": "Platform Modules", "value": modules_active, "drilldown": "/module-map"},
+    ]
+    kpis = [
+        k for k in all_kpis
+        if has_permission(ctx.permissions, KPI_PERMISSIONS.get(k["code"], "masters:read"))
+    ]
+    return {"kpis": kpis, "role_code": ctx.role_code}

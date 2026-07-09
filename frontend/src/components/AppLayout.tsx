@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { buildFallbackPhases, type NavPhase } from "../data/moduleCatalog";
 import BrandLogo from "./ui/BrandLogo";
 import NavIcon, { normalizeRoute } from "./ui/NavIcon";
+import { canAccessRoute, filterNavRoutes, homeRouteForRole, stripTenantPrefix } from "../utils/roleAccess";
 
 const EXTRA_LINKS = [
   { to: "/dashboard", label: "Dashboard", phase: "_top" },
@@ -18,8 +19,15 @@ const EXTRA_LINKS = [
 export default function AppLayout() {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [phases, setPhases] = useState<NavPhase[]>([]);
   const [navError, setNavError] = useState("");
+
+  const prefix = session?.tenant_code ? `/${session.tenant_code}` : "";
+  const currentRoute = stripTenantPrefix(location.pathname, session?.tenant_code);
+  if (session && !canAccessRoute(session, currentRoute)) {
+    return <Navigate to={`${prefix}${homeRouteForRole(session)}`} replace />;
+  }
 
   useEffect(() => {
     api<{ phases: NavPhase[] }>("/platform/module-flow")
@@ -40,7 +48,7 @@ export default function AppLayout() {
     const groups: { key: string; label: string; items: { to: string; label: string; route: string }[] }[] = [];
 
     const topItems = EXTRA_LINKS.filter(
-      (l) => !l.superOnly || session?.role_code === "SUPER_ADMIN",
+      (l) => (!l.superOnly || session?.role_code === "SUPER_ADMIN") && filterNavRoutes(session, l.to),
     ).map((l) => ({ to: withPrefix(l.to), label: l.label, route: l.to }));
     groups.push({ key: "_top", label: "Overview", items: topItems });
 
@@ -51,6 +59,7 @@ export default function AppLayout() {
       const moduleLinks = phase.modules
         .filter((m) => !m.super_only || session?.role_code === "SUPER_ADMIN")
         .filter((m) => !m.code.startsWith("_"))
+        .filter((m) => filterNavRoutes(session, m.route))
         .map((m) => ({
           to: withPrefix(m.route),
           label: m.name.length > 26 ? m.name.slice(0, 24) + "…" : m.name,
@@ -66,7 +75,7 @@ export default function AppLayout() {
     }
 
     return groups;
-  }, [phases, session?.role_code, session?.tenant_code]);
+  }, [phases, session, session?.role_code, session?.tenant_code]);
 
   const initials = session?.full_name
     ?.split(" ")

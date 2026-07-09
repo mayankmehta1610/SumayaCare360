@@ -137,6 +137,11 @@ def seed():
             ("REG_FEE", "Registration Fee", "registration", 100),
             ("IPD_DAY", "IPD Daily Charge", "inpatient", 2500),
             ("LAB_CBC", "CBC Lab Test", "lab", 350),
+            ("XRAY-CHEST", "Chest X-Ray", "radiology", 800),
+            ("USG-ABD", "USG Abdomen", "radiology", 1200),
+            ("CT-HEAD", "CT Head", "radiology", 4500),
+            ("MRI-SPINE", "MRI Spine", "radiology", 8500),
+            ("MAMMO-SCREEN", "Mammography Screening", "radiology", 2200),
         ]:
             db.add(m.Tariff(tenant_id=tenant.id, code=code, name=name, category=cat, amount=amt,
                             created_by=super_admin.id, updated_by=super_admin.id))
@@ -297,6 +302,9 @@ def seed():
                 created_by=super_admin.id, updated_by=super_admin.id,
             ))
 
+        db.commit()
+        from app.db.role_bootstrap import bootstrap_roles_and_demo_users
+        bootstrap_roles_and_demo_users(db)
         db.commit()
         print("Seed complete: superadmin@sumayacare360.com / SuperAdmin@360 | tenant=demo")
 

@@ -28,14 +28,18 @@ def upgrade():
             print("ERROR: seed did not create demo tenant")
             return
 
-        sync_platform_modules(db, None)
+        admin = db.query(m.User).filter(m.User.is_super_admin == True).first()
+        aid = admin.id if admin else None
+
+        sync_platform_modules(db, aid)
         from app.services.features import sync_feature_catalog
         added = sync_feature_catalog(db, aid)
         if added:
             print(f"  + synced {added} feature requirements")
 
-        admin = db.query(m.User).filter(m.User.is_super_admin == True).first()
-        aid = admin.id if admin else None
+        from app.db.role_bootstrap import bootstrap_roles_and_demo_users
+        boot = bootstrap_roles_and_demo_users(db)
+        print(f"  + roles/users bootstrap: {boot}")
         branch = db.query(m.Branch).filter(m.Branch.tenant_id == tenant.id).first()
 
         role = db.query(m.Role).filter(m.Role.code == "TENANT_ADMIN", m.Role.tenant_id.is_(None)).first()
@@ -60,6 +64,11 @@ def upgrade():
         for code, name, cat, amt in [
             ("IPD_DAY", "IPD Daily Charge", "inpatient", 2500),
             ("LAB_CBC", "CBC Lab Test", "lab", 350),
+            ("XRAY-CHEST", "Chest X-Ray", "radiology", 800),
+            ("USG-ABD", "USG Abdomen", "radiology", 1200),
+            ("CT-HEAD", "CT Head", "radiology", 4500),
+            ("MRI-SPINE", "MRI Spine", "radiology", 8500),
+            ("MAMMO-SCREEN", "Mammography Screening", "radiology", 2200),
         ]:
             if not db.query(m.Tariff).filter(m.Tariff.tenant_id == tenant.id, m.Tariff.code == code).first():
                 db.add(m.Tariff(

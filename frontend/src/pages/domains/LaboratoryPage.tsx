@@ -18,19 +18,12 @@ type LabOrder = {
   critical_flag?: boolean;
 };
 
-const NEXT_STATUS: Record<string, string> = {
-  ordered: "sample_collected",
-  sample_collected: "result_entered",
-  result_entered: "verified",
-};
-
-const STATUSES = ["ordered", "sample_collected", "result_entered", "verified", "critical_alert"];
-
 export default function LaboratoryPage() {
   const { session } = useAuth();
-  const write = canWrite(session, "encounters");
+  const write = canWrite(session, "laboratory");
   const [patients, setPatients] = useState<any[]>([]);
   const [tests, setTests] = useState<any[]>([]);
+  const [workflow, setWorkflow] = useState<{ statuses: string[]; next: Record<string, string> }>({ statuses: [], next: {} });
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ patient_id: "", test_code: "" });
@@ -44,8 +37,12 @@ export default function LaboratoryPage() {
   }, [patients]);
 
   useEffect(() => {
-    Promise.all([fetchPatients(), api<any[]>("/masters/lab-tests")])
-      .then(([p, t]) => { setPatients(p); setTests(t); })
+    Promise.all([
+      fetchPatients(),
+      api<any[]>("/masters/lab-tests"),
+      api<{ statuses: string[]; next: Record<string, string> }>("/clinical/lab-orders/workflow"),
+    ])
+      .then(([p, t, wf]) => { setPatients(p); setTests(t); setWorkflow(wf); })
       .catch((e) => setError(e.message));
   }, []);
 
@@ -61,7 +58,7 @@ export default function LaboratoryPage() {
   }
 
   async function advanceStatus(order: LabOrder, reload: () => void) {
-    const next = NEXT_STATUS[order.status];
+    const next = workflow.next[order.status];
     if (!next) return;
     await api(`/clinical/lab-orders/${order.id}/status?status=${next}`, { method: "PATCH" });
     setMsg(`Order ${order.order_no} → ${next}`);
@@ -96,7 +93,9 @@ export default function LaboratoryPage() {
     <div>
       <ModuleFlowBar moduleCode="laboratory-and-diagnostics" compact />
       <h1 className="page-title">Laboratory & diagnostics</h1>
-      <p className="muted">ordered → sample_collected → result_entered → verified / critical_alert</p>
+      <p className="muted">
+        {workflow.statuses.length > 0 ? workflow.statuses.join(" → ") : "Loading workflow…"}
+      </p>
       <div className="actions" style={{ marginBottom: "1rem" }}>
         <Link to="/clinical-hub" className="secondary button-link">Clinical hub</Link>
         <Link to="/radiology" className="secondary button-link">Radiology</Link>
@@ -166,12 +165,12 @@ export default function LaboratoryPage() {
         columns={columns}
         rowKey={(o) => o.id}
         searchPlaceholder="Search order no or test…"
-        statusOptions={STATUSES}
+        statusOptions={workflow.statuses}
         canWrite={write}
         renderActions={write ? (o, reload) => (
-          NEXT_STATUS[o.status] ? (
+          workflow.next[o.status] ? (
             <button type="button" className="secondary" onClick={() => advanceStatus(o, reload).catch((e) => setError(e.message))}>
-              → {NEXT_STATUS[o.status]}
+              → {workflow.next[o.status]}
             </button>
           ) : null
         ) : undefined}

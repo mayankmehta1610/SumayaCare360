@@ -4,7 +4,7 @@ import { Session, clearSession, currentSession, saveSession, api } from "../api/
 type AuthState = {
   session: Session | null;
   loading: boolean;
-  login: (email: string, password: string, tenant_code?: string) => Promise<void>;
+  login: (email: string, password: string, tenant_code?: string) => Promise<Session>;
   logout: () => void;
 };
 
@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         saveSession(data);
         setSession(data);
+        return data;
       },
       logout() {
         api("/auth/logout", { method: "POST" }).catch(() => {});

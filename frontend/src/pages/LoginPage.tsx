@@ -1,8 +1,24 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Activity, BarChart3, Shield, Stethoscope } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import BrandLogo from "../components/ui/BrandLogo";
+import { api } from "../api/client";
+import { homeRouteForRole } from "../utils/roleAccess";
+
+type DemoUser = {
+  email: string;
+  full_name: string;
+  role_code: string;
+  password: string;
+  description: string;
+};
+
+type DemoCreds = {
+  tenant_code: string;
+  super_admin: DemoUser & { role_code: string };
+  users: DemoUser[];
+};
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -13,15 +29,29 @@ export default function LoginPage() {
   const [tenant, setTenant] = useState(urlTenant || "demo");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [creds, setCreds] = useState<DemoCreds | null>(null);
+
+  useEffect(() => {
+    api<DemoCreds>("/auth/demo-credentials")
+      .then(setCreds)
+      .catch(() => setCreds(null));
+  }, []);
+
+  function fillLogin(u: DemoUser) {
+    setEmail(u.email);
+    setPassword(u.password);
+    setTenant(creds?.tenant_code || "demo");
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
-      await login(email, password, tenant || undefined);
+      const session = await login(email, password, tenant || undefined);
       const prefix = tenant ? `/${tenant}` : "";
-      navigate(`${prefix}/dashboard`);
+      const home = homeRouteForRole(session);
+      navigate(`${prefix}${home}`);
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {
@@ -81,12 +111,35 @@ export default function LoginPage() {
               Forgot password?
             </Link>
           </p>
-          <p className="muted" style={{ marginTop: "1.25rem", fontSize: "0.78rem", lineHeight: 1.5 }}>
-            Demo: <strong>admin@demo.sumaya</strong> / <strong>TenantAdmin@360</strong> · tenant <strong>demo</strong>
-            <br />
-            URL: <strong>/demo/login</strong>
-          </p>
         </form>
+
+        {creds && (
+          <div className="login-card" style={{ marginTop: "1rem", maxHeight: "420px", overflow: "auto" }}>
+            <h3 style={{ marginTop: 0 }}>Demo credentials (tenant: {creds.tenant_code})</h3>
+            <p className="muted" style={{ fontSize: "0.8rem" }}>Click a row to fill the login form. All data is loaded from the database.</p>
+            <table className="data-table" style={{ fontSize: "0.78rem" }}>
+              <thead>
+                <tr>
+                  <th>Role</th>
+                  <th>Email</th>
+                  <th>Password</th>
+                </tr>
+              </thead>
+              <tbody>
+                {creds.users.map((u) => (
+                  <tr key={u.email} style={{ cursor: "pointer" }} onClick={() => fillLogin(u)} title={u.description}>
+                    <td><span className="badge">{u.role_code.replace(/_/g, " ")}</span></td>
+                    <td>{u.email}</td>
+                    <td><code>{u.password}</code></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.75rem" }}>
+              Super admin: <strong>{creds.super_admin.email}</strong> / <code>{creds.super_admin.password}</code> (no tenant)
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

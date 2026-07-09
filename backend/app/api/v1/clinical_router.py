@@ -538,3 +538,45 @@ def export_radiology_orders(
         from app.services.export_util import records_to_csv
         return {"format": "csv", "count": len(records), "csv": records_to_csv(records)}
     return {"format": "json", "count": len(records), "records": records}
+
+
+@router.get("/lab-orders/workflow")
+def lab_workflow(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+    from app.data.clinical_workflow import LAB_WORKFLOW
+    from sqlalchemy import distinct
+    db_statuses = [
+        r[0] for r in db.query(distinct(m.LabOrder.status))
+        .filter(m.LabOrder.tenant_id == ctx.tenant_id).all() if r[0]
+    ]
+    statuses = list(dict.fromkeys(LAB_WORKFLOW["statuses"] + db_statuses))
+    return {"statuses": statuses, "next": LAB_WORKFLOW["next"]}
+
+
+@router.get("/radiology/workflow")
+def radiology_workflow(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+    from app.data.clinical_workflow import RADIOLOGY_WORKFLOW
+    from sqlalchemy import distinct
+    db_statuses = [
+        r[0] for r in db.query(distinct(m.RadiologyOrder.status))
+        .filter(m.RadiologyOrder.tenant_id == ctx.tenant_id).all() if r[0]
+    ]
+    statuses = list(dict.fromkeys(RADIOLOGY_WORKFLOW["statuses"] + db_statuses))
+    return {"statuses": statuses, "next": RADIOLOGY_WORKFLOW["next"]}
+
+
+@router.get("/radiology/studies")
+def radiology_studies(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+    from sqlalchemy import distinct
+    codes: set[str] = set()
+    for row in db.query(m.Tariff).filter(
+        m.Tariff.tenant_id == ctx.tenant_id,
+        m.Tariff.is_deleted == False,
+        m.Tariff.category.in_(["radiology", "imaging"]),
+    ):
+        codes.add(row.code)
+    for row in db.query(distinct(m.RadiologyOrder.study_code)).filter(
+        m.RadiologyOrder.tenant_id == ctx.tenant_id,
+    ):
+        if row[0]:
+            codes.add(row[0])
+    return [{"code": c, "name": c} for c in sorted(codes)]

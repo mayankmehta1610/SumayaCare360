@@ -14,27 +14,39 @@ ROLE_PERMISSIONS = {
     "TENANT_ADMIN": [
         "tenants:read", "branches:*", "users:*", "masters:*", "patients:*",
         "providers:*", "appointments:*", "encounters:*", "telemedicine:*",
-        "billing:*", "audit:read", "config:*"
+        "billing:*", "audit:read", "config:*", "vitals:*", "prescriptions:*",
+        "reports:read", "clinical:*", "laboratory:*", "radiology:*", "pharmacy:*",
     ],
     "BRANCH_ADMIN": [
         "branches:read", "masters:*", "patients:*", "providers:*",
-        "appointments:*", "encounters:read", "billing:read", "audit:read"
+        "appointments:*", "encounters:read", "billing:read", "audit:read", "reports:read",
     ],
     "DOCTOR": [
         "patients:read", "appointments:*", "encounters:*", "prescriptions:*",
-        "telemedicine:*", "masters:read"
+        "telemedicine:*", "masters:read", "vitals:*", "clinical:read", "clinical:*",
+        "laboratory:read", "radiology:read", "pharmacy:read",
     ],
     "NURSE": [
-        "patients:read", "appointments:read", "encounters:*", "vitals:*", "masters:read"
+        "patients:read", "appointments:read", "encounters:*", "vitals:*",
+        "masters:read", "clinical:read", "clinical:*",
     ],
     "RECEPTIONIST": [
-        "patients:*", "appointments:*", "queue:*", "masters:read", "billing:read"
+        "patients:*", "appointments:*", "queue:*", "masters:read", "billing:read",
     ],
     "BILLING_STAFF": [
-        "patients:read", "billing:*", "tariffs:read", "masters:read"
+        "patients:read", "billing:*", "tariffs:read", "masters:read", "reports:read",
+    ],
+    "PHARMACIST": [
+        "patients:read", "masters:read", "clinical:read", "pharmacy:*",
+    ],
+    "LAB_TECH": [
+        "patients:read", "masters:read", "clinical:read", "laboratory:*",
+    ],
+    "RADIOLOGIST": [
+        "patients:read", "masters:read", "clinical:read", "radiology:*",
     ],
     "PATIENT": [
-        "appointments:self", "telemedicine:join", "patients:self", "billing:self"
+        "appointments:self", "telemedicine:join", "patients:self", "billing:self",
     ],
 }
 
