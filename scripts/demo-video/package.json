@@ -1,0 +1,13 @@
+{
+  "name": "sumaya-demo-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node generate.mjs",
+    "install-browser": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "playwright": "^1.49.1"
+  }
+}

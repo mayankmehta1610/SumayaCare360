@@ -1,0 +1,10 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ts = fs.readFileSync(path.join(__dirname, "../../frontend/src/data/demoTourScript.ts"), "utf8");
+const block = ts.match(/export const DEMO_TOUR_STEPS[^=]*=\s*\[([\s\S]*?)\];\s*export const DEMO_TOUR/)?.[1];
+const re = /\{\s*id:\s*"([^"]+)"[\s\S]*?title:\s*"([^"]+)"[\s\S]*?route:\s*"([^"]+)"[\s\S]*?narration:\s*\n?\s*"([^"]+(?:\s*\+\s*\n?\s*"[^"]+)*)"/g;
+let m, c = 0;
+while ((m = re.exec(block))) c++;
+console.log("parsed steps:", c);
