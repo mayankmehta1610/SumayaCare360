@@ -111,7 +111,9 @@ def list_reports(ctx: AuthContext = Depends(resolve_tenant_context), db: Session
 @router.get("/platform/module-flow")
 def get_module_flow(ctx: AuthContext = Depends(get_current_context)):
     from app.data.module_flow import build_module_flow_response
-    return build_module_flow_response()
+    from app.data.role_navigation import filter_module_flow
+    raw = build_module_flow_response()
+    return filter_module_flow(raw, ctx.role_code, ctx.user.is_super_admin)
 
 
 @router.get("/platform/module-flow/{module_code}")

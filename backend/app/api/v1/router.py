@@ -130,6 +130,12 @@ def demo_credentials(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/auth/navigation")
+def auth_navigation(ctx: AuthContext = Depends(get_current_context)):
+    from app.data.role_navigation import build_navigation
+    return build_navigation(ctx.role_code, ctx.user.is_super_admin)
+
+
 @router.post("/auth/refresh", response_model=TokenResponse)
 def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)):
     try:

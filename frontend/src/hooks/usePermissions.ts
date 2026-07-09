@@ -4,10 +4,7 @@ export function canWrite(session: Session | null, resource = "masters"): boolean
   if (!session) return false;
   if (session.permissions.includes("*")) return true;
   if (session.role_code === "PATIENT") return false;
-  return (
-    hasPermission(session, `${resource}:*`) ||
-    hasPermission(session, "clinical:*")
-  );
+  return hasPermission(session, `${resource}:*`);
 }
 
 export function canDelete(session: Session | null, resource = "masters"): boolean {

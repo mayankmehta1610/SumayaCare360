@@ -4,40 +4,31 @@ import { ArrowRight, PlayCircle, Route } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import NavIcon from "../components/ui/NavIcon";
+import { canAccessRoute, type NavPhase } from "../utils/roleAccess";
 
 type Kpi = { code: string; label: string; value: number; drilldown: string };
 
-type Phase = {
-  id: string;
-  name: string;
-  description: string;
-  hub_route: string;
-  icon: string;
-  module_count: number;
-};
-
 export default function DashboardPage() {
   const [kpis, setKpis] = useState<Kpi[]>([]);
-  const [phases, setPhases] = useState<Phase[]>([]);
-  const [coverage, setCoverage] = useState<{ percent: number; implemented: number; total: number } | null>(null);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [loadingDemo, setLoadingDemo] = useState(false);
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, navigation } = useAuth();
   const prefix = session?.tenant_code ? `/${session.tenant_code}` : "";
   const patientCount = kpis.find((k) => k.code === "patients")?.value ?? 0;
   const isAdmin = session?.role_code === "TENANT_ADMIN" || session?.role_code === "SUPER_ADMIN";
+  const phases = (navigation?.phases || []) as NavPhase[];
+
+  const allowed = new Set(navigation?.allowed_routes || []);
+  const visibleKpis = kpis.filter((k) => allowed.has(k.drilldown));
+  const showCareJourney = allowed.has("/care-journey");
+  const showDemoTour = allowed.has("/demo-tour");
+  const showModuleMap = allowed.has("/module-map");
 
   async function load() {
-    const [kpiData, flowData, cov] = await Promise.all([
-      api<{ kpis: Kpi[] }>("/dashboard/summary"),
-      api<{ phases: Phase[] }>("/platform/module-flow"),
-      api<{ percent: number; implemented: number; total: number }>("/platform/features/coverage"),
-    ]);
+    const kpiData = await api<{ kpis: Kpi[] }>("/dashboard/summary");
     setKpis(kpiData.kpis);
-    setPhases(flowData.phases);
-    setCoverage(cov);
   }
 
   useEffect(() => {
@@ -58,15 +49,14 @@ export default function DashboardPage() {
     }
   }
 
+  const roleTitle = session?.role_code?.replace(/_/g, " ") || "Staff";
+
   return (
     <div>
       <header className="page-header">
-        <h1 className="page-title">Operations dashboard</h1>
+        <h1 className="page-title">{roleTitle} dashboard</h1>
         <p className="page-subtitle">
-          Live KPIs from PostgreSQL · click any metric to drill down
-          {coverage && (
-            <> · Feature coverage <strong>{coverage.percent}%</strong> ({coverage.implemented}/{coverage.total})</>
-          )}
+          Metrics and shortcuts for your role · data from PostgreSQL
         </p>
       </header>
 
@@ -83,61 +73,81 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="card card--hero" style={{ marginBottom: "1.5rem" }}>
-        <h3 style={{ marginTop: 0, fontFamily: "var(--display)", fontSize: "1.35rem" }}>Care journey — start here</h3>
-        <p className="muted">Patient → appointment → encounter → clinical chart → discharge → billing → payment</p>
-        <div className="actions" style={{ marginTop: "1rem" }}>
-          <Link to={`${prefix}/care-journey`} className="button-link">
-            <Route size={16} /> Launch care journey
-          </Link>
-          <Link to={`${prefix}/demo-tour`} className="button-link secondary">
-            <PlayCircle size={16} /> Voice demo tour
-          </Link>
-          <Link to={`${prefix}/module-map`} className="button-link secondary">
-            View all modules <ArrowRight size={14} />
-          </Link>
+      {(showCareJourney || showDemoTour || showModuleMap) && (
+        <div className="card card--hero" style={{ marginBottom: "1.5rem" }}>
+          <h3 style={{ marginTop: 0, fontFamily: "var(--display)", fontSize: "1.35rem" }}>Quick actions</h3>
+          <div className="actions" style={{ marginTop: "1rem" }}>
+            {showCareJourney && (
+              <Link to={`${prefix}/care-journey`} className="button-link">
+                <Route size={16} /> Care journey
+              </Link>
+            )}
+            {showDemoTour && (
+              <Link to={`${prefix}/demo-tour`} className="button-link secondary">
+                <PlayCircle size={16} /> Demo tour
+              </Link>
+            )}
+            {showModuleMap && (
+              <Link to={`${prefix}/module-map`} className="button-link secondary">
+                All modules <ArrowRight size={14} />
+              </Link>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="kpi-grid">
-        {kpis.map((k) => (
-          <div
-            key={k.code}
-            className="kpi"
-            onClick={() => navigate(`${prefix}${k.drilldown}`)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && navigate(`${prefix}${k.drilldown}`)}
-          >
-            <div className="kpi__icon">
-              <NavIcon code={k.code} size={20} />
+      {visibleKpis.length > 0 ? (
+        <div className="kpi-grid">
+          {visibleKpis.map((k) => (
+            <div
+              key={k.code}
+              className="kpi"
+              onClick={() => navigate(`${prefix}${k.drilldown}`)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && navigate(`${prefix}${k.drilldown}`)}
+            >
+              <div className="kpi__icon">
+                <NavIcon code={k.code} size={20} />
+              </div>
+              <div className="value">{k.value}</div>
+              <div className="label">{k.label}</div>
             </div>
-            <div className="value">{k.value}</div>
-            <div className="label">{k.label}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="card muted" style={{ marginBottom: "1.5rem" }}>
+          Use the sidebar to open your assigned modules.
+        </div>
+      )}
 
-      <h2 style={{ fontFamily: "var(--display)", fontSize: "1.35rem", marginBottom: "1rem" }}>Module phases</h2>
-      <div className="flow-phase-cards">
-        {phases.map((p) => (
-          <div
-            key={p.id}
-            className="card flow-phase-card"
-            onClick={() => navigate(`${prefix}${p.hub_route}`)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && navigate(`${prefix}${p.hub_route}`)}
-          >
-            <div className="flow-phase-card__icon">
-              <NavIcon route={p.hub_route} size={22} />
-            </div>
-            <strong>{p.name}</strong>
-            <p className="muted" style={{ fontSize: "0.8rem", margin: "0.35rem 0" }}>{p.description}</p>
-            <span className="badge">{p.module_count} modules</span>
+      {phases.length > 0 && (
+        <>
+          <h2 style={{ fontFamily: "var(--display)", fontSize: "1.35rem", marginBottom: "1rem" }}>Your modules</h2>
+          <div className="flow-phase-cards">
+            {phases.map((p) => {
+              const target = p.modules[0]?.route || (p.hub_visible !== false ? p.hub_route : null);
+              if (!target || !canAccessRoute(navigation, target)) return null;
+              return (
+                <div
+                  key={p.id}
+                  className="card flow-phase-card"
+                  onClick={() => navigate(`${prefix}${target}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === "Enter" && navigate(`${prefix}${target}`)}
+                >
+                  <div className="flow-phase-card__icon">
+                    <NavIcon route={target} size={22} />
+                  </div>
+                  <strong>{p.name}</strong>
+                  <span className="badge">{p.module_count} modules</span>
+                </div>
+              );
+            })}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 }

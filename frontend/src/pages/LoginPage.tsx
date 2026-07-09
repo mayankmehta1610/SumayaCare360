@@ -4,7 +4,7 @@ import { Activity, BarChart3, Shield, Stethoscope } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import BrandLogo from "../components/ui/BrandLogo";
 import { api } from "../api/client";
-import { homeRouteForRole } from "../utils/roleAccess";
+import { homeRouteForRoleCode } from "../utils/roleAccess";
 
 type DemoUser = {
   email: string;
@@ -50,8 +50,7 @@ export default function LoginPage() {
     try {
       const session = await login(email, password, tenant || undefined);
       const prefix = tenant ? `/${tenant}` : "";
-      const home = homeRouteForRole(session);
-      navigate(`${prefix}${home}`);
+      navigate(`${prefix}${homeRouteForRoleCode(session.role_code)}`);
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {
