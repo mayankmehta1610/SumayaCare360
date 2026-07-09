@@ -57,10 +57,10 @@ def link_patient_portal_user(db: Session, tenant_id) -> None:
     if not user:
         return
     patient = db.query(m.Patient).filter(
-        m.Patient.tenant_id == tenant_id, m.Patient.is_deleted == False,
-    ).order_by(m.Patient.created_at).first()
-    if patient and patient.email != user.email:
-        patient.email = user.email
+        m.Patient.tenant_id == tenant_id, m.Patient.mrn == "DEMO-001", m.Patient.is_deleted == False,
+    ).first()
+    if patient:
+        patient.email = "patient@demo.sumaya"
 
 
 def bootstrap_roles_and_demo_users(db: Session) -> dict:

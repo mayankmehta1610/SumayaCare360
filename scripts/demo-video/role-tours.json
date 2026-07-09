@@ -1,0 +1,108 @@
+[
+  {
+    "role": "TENANT_ADMIN",
+    "email": "admin@demo.sumaya",
+    "password": "TenantAdmin@360",
+    "intro": "You are logged in as Tenant Admin. This role owns the full hospital platform. The sidebar lists every module. All tables below load live rows from PostgreSQL — eight demo patients, lab orders, billing, and records across thirty-six modules.",
+    "routes": [
+      { "path": "/dashboard", "say": "The admin dashboard shows every KPI your role can access — patient counts, appointments, lab queue, and revenue — each number queried from the database." },
+      { "path": "/patients", "say": "Patients lists all registered patients with search, pagination, and export. Demo tenant has eight patients with MRNs starting DEMO." },
+      { "path": "/appointments", "say": "Appointments shows booked slots, queue tokens, and telemedicine visits pulled from the appointments table." },
+      { "path": "/billing", "say": "Billing displays invoices and payment status. Demo data includes multiple issued invoices linked to real patients." },
+      { "path": "/laboratory", "say": "Laboratory shows CBC orders in various workflow states — ordered, collected, verified — all from lab_orders." },
+      { "path": "/reports", "say": "Reports runs analytics definitions stored in the database and returns detail rows you can export." },
+      { "path": "/module-map", "say": "Module map is the full catalog of thirty-six integrated modules with work-item counts from module_records." }
+    ]
+  },
+  {
+    "role": "DOCTOR",
+    "email": "doctor@demo.sumaya",
+    "password": "Doctor@360",
+    "intro": "You are logged in as Doctor. Notice the sidebar — only clinical screens appear. Billing, administration, inventory, and operations modules are hidden. You cannot navigate to them even by URL.",
+    "routes": [
+      { "path": "/dashboard", "say": "Doctor dashboard shows clinical KPIs only — patients, appointments, open encounters, and lab orders relevant to your practice." },
+      { "path": "/patients", "say": "Read-only patient list for chart review. Search and export work on live patient rows." },
+      { "path": "/encounters", "say": "Encounters lists OPD visits with chief complaint, vitals, and clinical notes stored in the database." },
+      { "path": "/telemedicine", "say": "Telemedicine shows completed and scheduled video sessions with room IDs from telemedicine_sessions." },
+      { "path": "/laboratory", "say": "Doctors can view lab orders and results. Orders reference master test codes like CBC from lab_tests." },
+      { "path": "/pharmacy", "say": "Pharmacy queue shows dispense requests — read access for doctors to track prescriptions." }
+    ]
+  },
+  {
+    "role": "NURSE",
+    "email": "nurse@demo.sumaya",
+    "password": "Nurse@360",
+    "intro": "You are logged in as Nurse. The menu is limited to nursing and inpatient care. There is no billing, no finance, no pharmacy admin, and no tenant settings beyond MFA.",
+    "routes": [
+      { "path": "/dashboard", "say": "Nurse dashboard KPIs focus on patients, encounters, nursing tasks, and inpatient census — not revenue or claims." },
+      { "path": "/patients", "say": "Patient list for ward rounds and vitals capture." },
+      { "path": "/encounters", "say": "Active and closed encounters where nurses document vitals and progress notes." },
+      { "path": "/nursing", "say": "Nursing tasks desk shows vitals checks, medication administration, and wound care items assigned from nursing_tasks." },
+      { "path": "/inpatient", "say": "Inpatient admissions with bed allocation — demo patient Vikram Singh is admitted to ward GEN." }
+    ]
+  },
+  {
+    "role": "RECEPTIONIST",
+    "email": "reception@demo.sumaya",
+    "password": "Reception@360",
+    "intro": "You are logged in as Receptionist. Front-office screens only — register patients, book appointments, manage emergency triage queue, and view providers. Clinical order entry and billing write access are not in your menu.",
+    "routes": [
+      { "path": "/dashboard", "say": "Reception dashboard highlights appointment volume and patient registrations." },
+      { "path": "/patients", "say": "Full patient registration and CRM — create and edit patient demographics." },
+      { "path": "/appointments", "say": "Appointment booking with queue tokens and check-in status from the database." },
+      { "path": "/emergency", "say": "Emergency triage board with ESI levels and disposition — four demo triage cases loaded." },
+      { "path": "/providers", "say": "Provider directory with specialties and consultation schedules." }
+    ]
+  },
+  {
+    "role": "BILLING_STAFF",
+    "email": "billing@demo.sumaya",
+    "password": "Billing@360",
+    "intro": "You are logged in as Billing Staff. Finance and revenue screens only. No clinical modules, no nursing, no laboratory order entry appear in your sidebar.",
+    "routes": [
+      { "path": "/billing", "say": "Billing desk with invoices, estimates, and UPI payments — demo invoices INV-DEMO series in the database." },
+      { "path": "/insurance-claims", "say": "Insurance claims in draft through paid status with payer codes STAR and ICICI from insurance_payers master." },
+      { "path": "/revenue-cycle", "say": "Revenue cycle view combining claims, invoices, and payer contracts." },
+      { "path": "/reports", "say": "Financial reports — revenue dashboard and audit trail exports." }
+    ]
+  },
+  {
+    "role": "PHARMACIST",
+    "email": "pharmacist@demo.sumaya",
+    "password": "Pharmacist@360",
+    "intro": "You are logged in as Pharmacist. Your workspace opens on the pharmacy dispense queue. Only pharmacy and patient lookup are available.",
+    "routes": [
+      { "path": "/pharmacy", "say": "Pharmacy dispense queue with medicines from masters — Paracetamol and Amoxicillin stock levels in medicines table." },
+      { "path": "/patients", "say": "Patient lookup to verify prescription against the correct MRN before dispensing." }
+    ]
+  },
+  {
+    "role": "LAB_TECH",
+    "email": "labtech@demo.sumaya",
+    "password": "LabTech@360",
+    "intro": "You are logged in as Lab Technician. You land directly on the laboratory workbench. No other hospital modules appear in navigation.",
+    "routes": [
+      { "path": "/laboratory", "say": "Lab order worklist with workflow buttons driven by API — sample collection, result entry, verification. Eight demo orders in PostgreSQL." },
+      { "path": "/patients", "say": "Patient lookup to match samples to MRN before processing." }
+    ]
+  },
+  {
+    "role": "RADIOLOGIST",
+    "email": "radiologist@demo.sumaya",
+    "password": "Radiologist@360",
+    "intro": "You are logged in as Radiologist. Imaging orders and reporting only. Study codes come from radiology tariffs and existing orders — not hardcoded lists.",
+    "routes": [
+      { "path": "/radiology", "say": "Imaging orders for chest X-ray, ultrasound, CT, and MRI with report dictation. Status workflow from ordered to reported." },
+      { "path": "/patients", "say": "Patient context for imaging orders — name and MRN from patients table." }
+    ]
+  },
+  {
+    "role": "PATIENT",
+    "email": "patient@demo.sumaya",
+    "password": "Patient@360",
+    "intro": "You are logged in as Patient portal user Rajesh Kumar. The entire hospital admin UI is hidden. Only self-service portal screens are available.",
+    "routes": [
+      { "path": "/portal", "say": "Patient portal shows your appointments, bills, telemedicine join links, and visit summaries — filtered to your patient record by email patient@demo.sumaya." }
+    ]
+  }
+]

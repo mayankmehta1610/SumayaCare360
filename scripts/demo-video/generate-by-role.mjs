@@ -14,90 +14,41 @@ const OUT = path.join(__dirname, "output-roles");
 const FFMPEG = ffmpegInstaller.path;
 
 const BASE = process.env.DEMO_BASE_URL || "http://localhost:3000";
+const API = process.env.DEMO_API_URL || BASE.replace(":3000", ":8000") + "/api/v1";
 const TENANT = "demo";
 
-const ROLE_TOURS = [
-  {
-    role: "TENANT_ADMIN",
-    email: "admin@demo.sumaya",
-    password: "TenantAdmin@360",
-    intro:
-      "Tenant Admin has full hospital access. You see every module in the sidebar, all dashboard KPIs from the live database, patients, billing, reports, and masters.",
-    routes: ["/dashboard", "/patients", "/appointments", "/billing", "/reports", "/masters", "/module-map"],
-  },
-  {
-    role: "BRANCH_ADMIN",
-    email: "branch@demo.sumaya",
-    password: "BranchAdmin@360",
-    intro:
-      "Branch Admin manages front-office operations for a campus. Navigation is limited to patients, appointments, providers, and read-only billing — no lab or pharmacy write access.",
-    routes: ["/dashboard", "/patients", "/appointments", "/providers", "/billing"],
-  },
-  {
-    role: "DOCTOR",
-    email: "doctor@demo.sumaya",
-    password: "Doctor@360",
-    intro:
-      "Doctor sees clinical workflows: patient charts, encounters, telemedicine, and order views. Dashboard KPIs are filtered to clinical metrics pulled from the database.",
-    routes: ["/dashboard", "/patients", "/encounters", "/telemedicine", "/laboratory", "/pharmacy"],
-  },
-  {
-    role: "NURSE",
-    email: "nurse@demo.sumaya",
-    password: "Nurse@360",
-    intro:
-      "Nurse focuses on inpatient care, nursing tasks, vitals, and encounters. Sidebar hides billing administration and tenant settings.",
-    routes: ["/dashboard", "/patients", "/nursing", "/inpatient", "/encounters"],
-  },
-  {
-    role: "RECEPTIONIST",
-    email: "reception@demo.sumaya",
-    password: "Reception@360",
-    intro:
-      "Receptionist registers patients, books appointments, and manages the queue. Clinical modules like laboratory and radiology are hidden.",
-    routes: ["/dashboard", "/patients", "/appointments", "/emergency"],
-  },
-  {
-    role: "BILLING_STAFF",
-    email: "billing@demo.sumaya",
-    password: "Billing@360",
-    intro:
-      "Billing staff works invoices, payments, revenue cycle, and insurance claims. Patient list is read-only; clinical order screens are not in the menu.",
-    routes: ["/dashboard", "/billing", "/insurance-claims", "/revenue-cycle", "/reports"],
-  },
-  {
-    role: "PHARMACIST",
-    email: "pharmacist@demo.sumaya",
-    password: "Pharmacist@360",
-    intro:
-      "Pharmacist lands on the pharmacy dispense queue with medicine masters from the database. Other hospital modules are restricted by role permissions.",
-    routes: ["/pharmacy", "/patients", "/masters"],
-  },
-  {
-    role: "LAB_TECH",
-    email: "labtech@demo.sumaya",
-    password: "LabTech@360",
-    intro:
-      "Lab technician sees only the laboratory workbench: orders, statuses, and results loaded from API — no hardcoded test lists.",
-    routes: ["/laboratory", "/patients"],
-  },
-  {
-    role: "RADIOLOGIST",
-    email: "radiologist@demo.sumaya",
-    password: "Radiologist@360",
-    intro:
-      "Radiologist accesses imaging orders and reporting. Study codes come from radiology tariffs and existing orders in the database.",
-    routes: ["/radiology", "/patients"],
-  },
-  {
-    role: "PATIENT",
-    email: "patient@demo.sumaya",
-    password: "Patient@360",
-    intro:
-      "Patient portal user sees only the self-service portal: appointments, bills, and care summary linked to their patient record in the database.",
-    routes: ["/portal"],
-  },
-];
+const ROLE_TOURS = JSON.parse(fs.readFileSync(path.join(__dirname, "role-tours.json"), "utf8"));
+
+async function ensureDemoData() {
+  console.log("Ensuring demo dataset via API…");
+  const loginRes = await fetch(`${API}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: "admin@demo.sumaya",
+      password: "TenantAdmin@360",
+      tenant_code: TENANT,
+    }),
+  });
+  if (!loginRes.ok) {
+    console.warn("  Demo reload login failed:", loginRes.status);
+    return;
+  }
+  const { access_token } = await loginRes.json();
+  const reloadRes = await fetch(`${API}/admin/demo-reload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+      "X-Tenant-Code": TENANT,
+    },
+  });
+  if (reloadRes.ok) {
+    const body = await reloadRes.json();
+    console.log(`  Demo data ready: ${body.patients} patients`);
+  } else {
+    console.warn("  Demo reload failed:", reloadRes.status);
+  }
+}
 
 function ensureDir(p) {
   fs.mkdirSync(p, { recursive: true });
@@ -175,8 +126,8 @@ async function loginAs(page, cred) {
   await page.locator('label:has-text("Email")').locator("..").locator("input").fill(cred.email);
   await page.locator('label:has-text("Password")').locator("..").locator("input").fill(cred.password);
   await page.click('button:has-text("Sign in")');
-  await page.waitForSelector(".sidebar, h1.page-title", { timeout: 120000 });
-  await page.waitForTimeout(2500);
+  await page.waitForURL(new RegExp(`/${TENANT}/(dashboard|portal|billing|pharmacy|laboratory|radiology)`), { timeout: 120000 });
+  await page.waitForTimeout(3000);
 }
 
 async function logout(page) {
@@ -216,6 +167,8 @@ async function main() {
   ensureDir(path.join(OUT, "frames"));
   ensureDir(path.join(OUT, "segments"));
 
+  await ensureDemoData();
+
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await context.newPage();
@@ -233,7 +186,7 @@ async function main() {
     page,
     "title",
     "SUMAYA Care 360 Role-Based Access Tour",
-    "This video demonstrates what each hospital role sees after login. Every screen loads live data from the database. Ten roles, ten tailored experiences.",
+    "SUMAYA Care 360 — strict role-based access demo. Each hospital role sees a different menu and different data scope. All tables load from PostgreSQL. We will log in as nine roles and show exactly what each person is allowed to see.",
     titlePng,
     titleWav,
     titleSeg
@@ -267,33 +220,29 @@ async function main() {
 
     for (const route of tour.routes) {
       sceneIdx += 1;
-      const url = `${BASE}/${TENANT}${route}`;
+      const pathRoute = route.path || route;
+      const narration = route.say || `Viewing ${pathRoute} as ${tour.role.replace(/_/g, " ").toLowerCase()}.`;
+      const url = `${BASE}/${TENANT}${pathRoute}`;
       await gotoRetry(page, url);
-      if (route === "/dashboard") {
-        const btn = page.locator('button:has-text("Load demo data")');
-        if (await btn.isVisible().catch(() => false)) {
-          await btn.click();
-          await page.waitForTimeout(5000);
-        }
-      }
-      const png = path.join(OUT, "frames", `${String(sceneIdx).padStart(3, "0")}_${tour.role}${route.replace(/\//g, "_")}.png`);
+      await page.waitForTimeout(1500);
+      const png = path.join(OUT, "frames", `${String(sceneIdx).padStart(3, "0")}_${tour.role}${pathRoute.replace(/\//g, "_")}.png`);
       await page.screenshot({ path: png });
-      const label = route.replace(/^\//, "").replace(/-/g, " ") || "home";
+      const label = pathRoute.replace(/^\//, "").replace(/-/g, " ") || "home";
       const wav = path.join(OUT, "segments", `${String(sceneIdx).padStart(3, "0")}.wav`);
       const seg = path.join(OUT, "segments", `${String(sceneIdx).padStart(3, "0")}.mp4`);
       try {
         await makeSegment(
           page,
-          `${tour.role}${route}`,
+          `${tour.role}${pathRoute}`,
           `${tour.role.replace(/_/g, " ")} - ${label}`,
-          `As ${tour.role.replace(/_/g, " ").toLowerCase()}, the ${label} screen shows database-backed lists, search, pagination, and export where your role has permission.`,
+          narration,
           png,
           wav,
           seg
         );
         segmentFiles.push(seg);
       } catch (e) {
-        console.error(`  Scene failed (${tour.role}${route}): ${e.message}`);
+        console.error(`  Scene failed (${tour.role}${pathRoute}): ${e.message}`);
         if (fs.existsSync(seg)) segmentFiles.push(seg);
       }
     }

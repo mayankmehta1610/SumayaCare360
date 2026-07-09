@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.data.domain_lifecycles import DOMAIN_MODULES, get_domain_meta
@@ -33,6 +34,26 @@ def is_demo_loaded(db: Session, tenant_id: UUID) -> bool:
     return count >= 8
 
 
+def is_demo_complete(db: Session, tenant_id: UUID) -> bool:
+    if not is_demo_loaded(db, tenant_id):
+        return False
+    records = db.query(m.ModuleRecord).filter(m.ModuleRecord.tenant_id == tenant_id).count()
+    invoices = db.query(m.Invoice).filter(m.Invoice.tenant_id == tenant_id).count()
+    lab = db.query(m.LabOrder).filter(m.LabOrder.tenant_id == tenant_id).count()
+    return records >= 60 and invoices >= 4 and lab >= 5
+
+
+def ensure_demo_data(db: Session) -> bool:
+    """Load or refresh demo dataset when missing or incomplete. Returns True if seed ran."""
+    tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
+    if not tenant:
+        return False
+    if is_demo_complete(db, tenant.id):
+        return False
+    seed_demo_replay(db, force=is_demo_loaded(db, tenant.id))
+    return True
+
+
 def seed_demo_replay(db: Session, *, force: bool = False) -> None:
     tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
     if not tenant:
@@ -57,7 +78,7 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
 
     # ── Patients ──
     patients_data = [
-        ("DEMO-001", "Rajesh", "Kumar", "M", "1985-03-12", "9876500001", "rajesh.k@demo.in"),
+        ("DEMO-001", "Rajesh", "Kumar", "M", "1985-03-12", "9876500001", "patient@demo.sumaya"),
         ("DEMO-002", "Priya", "Sharma", "F", "1990-07-22", "9876500002", "priya.s@demo.in"),
         ("DEMO-003", "Ahmed", "Hassan", "M", "1978-11-05", "9876500003", "ahmed.h@demo.in"),
         ("DEMO-004", "Sunita", "Patel", "F", "1995-01-18", "9876500004", "sunita.p@demo.in"),
@@ -80,14 +101,14 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
 
     # ── Appointments ──
     appts: list[m.Appointment] = []
-    for i, p in enumerate(patients[:5]):
+    for i, p in enumerate(patients):
         a = m.Appointment(
             tenant_id=tenant.id, branch_id=branch.id,
             patient_id=p.id, provider_id=provider.id,
-            scheduled_at=NOW + timedelta(days=i - 2, hours=10),
-            mode="in_person" if i % 2 == 0 else "telemedicine",
-            status=["scheduled", "checked_in", "completed", "scheduled", "no_show"][i],
-            reason=["Fever", "Follow-up HTN", "Back pain", "Diabetes review", "Skin rash"][i],
+            scheduled_at=NOW + timedelta(days=i - 3, hours=10 + (i % 4)),
+            mode="in_person" if i % 3 else "telemedicine",
+            status=["scheduled", "checked_in", "completed", "scheduled", "no_show", "completed", "checked_in", "scheduled"][i % 8],
+            reason=["Fever", "Follow-up HTN", "Back pain", "Diabetes review", "Skin rash", "Cough", "Antenatal", "Post-op"][i % 8],
             queue_token=f"T{i+101:03d}",
             created_by=actor, updated_by=actor,
         )
@@ -135,34 +156,53 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
 
     # ── Lab orders (mixed statuses) ──
     lab_statuses = ["ordered", "sample_collected", "result_entered", "verified", "critical_alert"]
-    for i, p in enumerate(patients[:5]):
+    for i, p in enumerate(patients[:8]):
         db.add(m.LabOrder(
             tenant_id=tenant.id, patient_id=p.id, provider_id=provider.id,
             encounter_id=encounters[i].id if i < len(encounters) else None,
-            order_no=f"LAB-{i+1:06d}", test_code="CBC", status=lab_statuses[i],
-            result_value="12.5 g/dL" if lab_statuses[i] in ("result_entered", "verified", "critical_alert") else None,
-            result_notes="Within range" if i < 3 else "Critical low Hb",
-            critical_flag=(lab_statuses[i] == "critical_alert"),
+            order_no=f"LAB-{i+1:06d}", test_code="CBC", status=lab_statuses[i % len(lab_statuses)],
+            result_value="12.5 g/dL" if lab_statuses[i % len(lab_statuses)] in ("result_entered", "verified", "critical_alert") else None,
+            result_notes="Within range" if i % 5 != 4 else "Critical low Hb",
+            critical_flag=(lab_statuses[i % len(lab_statuses)] == "critical_alert"),
             created_by=actor, updated_by=actor,
         ))
 
     # ── Radiology ──
     rad_statuses = ["ordered", "scheduled", "acquired", "reported"]
-    for i, st in enumerate(rad_statuses):
+    rad_studies = ["XRAY-CHEST", "USG-ABD", "CT-HEAD", "MRI-SPINE"]
+    for i, p in enumerate(patients[:6]):
+        st = rad_statuses[i % len(rad_statuses)]
         db.add(m.RadiologyOrder(
-            tenant_id=tenant.id, patient_id=patients[i].id, provider_id=provider.id,
-            order_no=f"RAD-{i+1:06d}", study_code="CXR", status=st,
+            tenant_id=tenant.id, patient_id=p.id, provider_id=provider.id,
+            order_no=f"RAD-{i+1:06d}", study_code=rad_studies[i % len(rad_studies)], status=st,
             report_text="No acute findings" if st == "reported" else None,
             scheduled_at=NOW + timedelta(hours=2) if st == "scheduled" else None,
             created_by=actor, updated_by=actor,
         ))
 
     # ── Pharmacy dispenses ──
-    for i, st in enumerate(["queued", "verified", "dispensed"]):
+    for i, p in enumerate(patients[:6]):
+        st = ["queued", "verified", "dispensed"][i % 3]
         db.add(m.PharmacyDispense(
-            tenant_id=tenant.id, patient_id=patients[i].id,
+            tenant_id=tenant.id, patient_id=p.id,
             dispense_no=f"RX-{i+1:06d}", medicine_code="PARA500", qty=10,
             status=st, created_by=actor, updated_by=actor,
+        ))
+
+    # ── Prescriptions ──
+    for i, enc in enumerate(encounters):
+        rx = m.Prescription(
+            tenant_id=tenant.id, encounter_id=enc.id, patient_id=enc.patient_id,
+            provider_id=provider.id, status="active",
+            created_by=actor, updated_by=actor,
+        )
+        db.add(rx)
+        db.flush()
+        db.add(m.PrescriptionLine(
+            tenant_id=tenant.id, prescription_id=rx.id,
+            medicine_code="PARA500", medicine_name="Paracetamol 500mg",
+            dose="500mg", frequency="TDS", duration="5 days",
+            created_by=actor, updated_by=actor,
         ))
 
     # ── IPD + nursing ──
@@ -242,6 +282,13 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
         created_by=actor, updated_by=actor,
     )
     db.add(inv2)
+    for idx, p in enumerate(patients[2:6], start=3):
+        db.add(m.Invoice(
+            tenant_id=tenant.id, patient_id=p.id,
+            invoice_no=f"INV-DEMO-{idx:06d}", status="issued",
+            total=Decimal(str(800 + idx * 200)),
+            created_by=actor, updated_by=actor,
+        ))
 
     # ── Insurance claims ──
     claim_statuses = ["draft", "submitted", "under_review", "approved", "paid"]
@@ -286,42 +333,42 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
         created_by=actor, updated_by=actor,
     ))
 
-    # ── Dedicated domain module records ──
+    # ── Dedicated domain module records (every submodule) ──
     for code in DOMAIN_MODULES:
         meta = get_domain_meta(code)
         if not meta:
             continue
         subs = meta["submodules"]
         statuses = meta["statuses"]
-        for j, sub in enumerate(subs[:2]):
-            st = statuses[min(j + 1, len(statuses) - 1)] if j else meta["initial_status"]
-            db.add(m.ModuleRecord(
-                tenant_id=tenant.id, module_code=code, submodule=sub,
-                reference_no=f"DEMO-{code[:6].upper()}-{j+1:03d}",
-                title=f"Demo — {sub}", status=st,
-                patient_id=patients[j % len(patients)].id,
-                payload={"description": f"Replay data for {meta['name']}", "priority": "medium"},
-                created_by=actor, updated_by=actor,
-            ))
+        for j, sub in enumerate(subs):
+            for k in range(2):
+                st = statuses[min(j + k, len(statuses) - 1)] if k else meta["initial_status"]
+                db.add(m.ModuleRecord(
+                    tenant_id=tenant.id, module_code=code, submodule=sub,
+                    reference_no=f"DEMO-{code[:6].upper()}-{j+1:02d}{k+1}",
+                    title=f"Demo {sub} — item {k+1}", status=st,
+                    patient_id=patients[(j + k) % len(patients)].id,
+                    payload={"description": f"Replay data for {meta['name']}", "priority": "medium"},
+                    created_by=actor, updated_by=actor,
+                ))
 
-    # ── Platform modules not in DOMAIN_MODULES (identity etc.) — one record each ──
+    # ── Platform modules not in DOMAIN_MODULES — records per submodule ──
     domain_codes = set(DOMAIN_MODULES.keys())
     for item in MODULE_CATALOG:
         code = item["code"]
         if code in domain_codes:
             continue
-        if db.query(m.ModuleRecord).filter(
-            m.ModuleRecord.tenant_id == tenant.id, m.ModuleRecord.module_code == code
-        ).count() > 0:
-            continue
-        sub = (item.get("submodules") or ["General"])[0]
-        db.add(m.ModuleRecord(
-            tenant_id=tenant.id, module_code=code, submodule=sub,
-            reference_no=f"PLAT-{code[:8].upper()}-001",
-            title=f"Demo workflow — {item['name']}", status="in_progress",
-            payload={"description": f"Platform demo for {item['name']}"},
-            created_by=actor, updated_by=actor,
-        ))
+        subs = item.get("submodules") or ["General"]
+        for j, sub in enumerate(subs):
+            for k in range(2):
+                db.add(m.ModuleRecord(
+                    tenant_id=tenant.id, module_code=code, submodule=sub,
+                    reference_no=f"PLAT-{code[:6].upper()}-{j+1:02d}{k+1}",
+                    title=f"Demo {sub} — {item['name']}", status="in_progress" if k == 0 else "completed",
+                    patient_id=patients[j % len(patients)].id if j < len(patients) else None,
+                    payload={"description": f"Platform demo for {item['name']}"},
+                    created_by=actor, updated_by=actor,
+                ))
 
     # ── Location, documents, notifications ──
     db.add(m.LocationEvent(
@@ -348,6 +395,11 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
 
     # ── Expanded API sample resources ──
     for area in ["audit-trail-and-governance", "api-observability-and-traceability"]:
+        ref = f"EXP-DEMO-{area[:4].upper()}"
+        if db.query(m.ExpandedResource).filter(
+            m.ExpandedResource.tenant_id == tenant.id, m.ExpandedResource.reference_no == ref,
+        ).first():
+            continue
         db.add(m.ExpandedResource(
             tenant_id=tenant.id, area_code=area, resource_code="database-audit-fields",
             reference_no=f"EXP-DEMO-{area[:4].upper()}",
@@ -375,19 +427,46 @@ def _clear_demo_clinical(db: Session, tenant_id: UUID) -> None:
     ]
     if not demo_ids:
         return
+
+    enc_ids = [r[0] for r in db.query(m.Encounter.id).filter(m.Encounter.patient_id.in_(demo_ids)).all()]
+    inv_ids = [r[0] for r in db.query(m.Invoice.id).filter(m.Invoice.patient_id.in_(demo_ids)).all()]
+    rx_ids = [r[0] for r in db.query(m.Prescription.id).filter(m.Prescription.patient_id.in_(demo_ids)).all()]
+
+    if rx_ids:
+        db.query(m.PrescriptionLine).filter(m.PrescriptionLine.prescription_id.in_(rx_ids)).delete(synchronize_session=False)
+    if enc_ids:
+        db.query(m.Vital).filter(m.Vital.encounter_id.in_(enc_ids)).delete(synchronize_session=False)
+        db.query(m.ClinicalNote).filter(m.ClinicalNote.encounter_id.in_(enc_ids)).delete(synchronize_session=False)
+        db.query(m.EncounterDiagnosis).filter(m.EncounterDiagnosis.encounter_id.in_(enc_ids)).delete(synchronize_session=False)
+    if inv_ids:
+        db.query(m.Payment).filter(m.Payment.invoice_id.in_(inv_ids)).delete(synchronize_session=False)
+        db.query(m.InvoiceLine).filter(m.InvoiceLine.invoice_id.in_(inv_ids)).delete(synchronize_session=False)
+        db.query(m.Invoice).filter(m.Invoice.id.in_(inv_ids)).delete(synchronize_session=False)
+
     for model, col in [
-        (m.Appointment, "patient_id"), (m.Encounter, "patient_id"),
-        (m.LabOrder, "patient_id"), (m.RadiologyOrder, "patient_id"),
-        (m.PharmacyDispense, "patient_id"), (m.IpdAdmission, "patient_id"),
-        (m.NursingTask, "patient_id"), (m.TriageAssessment, "patient_id"),
-        (m.OtProcedure, "patient_id"), (m.InsuranceClaim, "patient_id"),
-        (m.TelemedicineSession, "patient_id"), (m.PathwayEnrollment, "patient_id"),
-        (m.Invoice, "patient_id"), (m.LocationEvent, "patient_id"),
+        (m.TelemedicineSession, "patient_id"),
+        (m.NursingTask, "patient_id"),
+        (m.LabOrder, "patient_id"),
+        (m.RadiologyOrder, "patient_id"),
+        (m.PharmacyDispense, "patient_id"),
+        (m.Prescription, "patient_id"),
+        (m.TriageAssessment, "patient_id"),
+        (m.OtProcedure, "patient_id"),
+        (m.InsuranceClaim, "patient_id"),
+        (m.PathwayEnrollment, "patient_id"),
+        (m.LocationEvent, "patient_id"),
+        (m.Encounter, "patient_id"),
+        (m.IpdAdmission, "patient_id"),
+        (m.Appointment, "patient_id"),
     ]:
         db.query(model).filter(getattr(model, col).in_(demo_ids)).delete(synchronize_session=False)
+
     db.query(m.ModuleRecord).filter(
         m.ModuleRecord.tenant_id == tenant_id,
-        m.ModuleRecord.reference_no.like("DEMO-%"),
+        or_(
+            m.ModuleRecord.reference_no.like("DEMO-%"),
+            m.ModuleRecord.reference_no.like("PLAT-%"),
+        ),
     ).delete(synchronize_session=False)
     db.query(m.Patient).filter(m.Patient.id.in_(demo_ids)).delete(synchronize_session=False)
     db.flush()

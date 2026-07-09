@@ -86,9 +86,9 @@ def upgrade():
         db.commit()
 
         try:
-            from app.db.demo_data import seed_demo_replay
-            force = os.getenv("DEMO_REPLAY_FORCE", "").lower() in ("1", "true", "yes")
-            seed_demo_replay(db, force=force)
+            from app.db.demo_data import ensure_demo_data
+            if ensure_demo_data(db):
+                print("  + demo dataset loaded/refreshed")
         except Exception as exc:
             import traceback
             print(f"Demo replay warning: {exc}")

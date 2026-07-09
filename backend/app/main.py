@@ -57,7 +57,7 @@ def on_startup():
     apply_schema_patches()
     from app.db.session import SessionLocal
     from app.services.modules import sync_platform_modules
-    from app.db.demo_data import seed_demo_replay
+    from app.db.demo_data import ensure_demo_data
     db = SessionLocal()
     try:
         sync_platform_modules(db, None)
@@ -67,7 +67,7 @@ def on_startup():
         db.commit()
         tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
         if tenant:
-            seed_demo_replay(db)
+            ensure_demo_data(db)
     except Exception as exc:
         import traceback
         print(f"Startup seed warning: {exc}")
