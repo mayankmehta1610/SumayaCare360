@@ -29,6 +29,10 @@ def upgrade():
             return
 
         sync_platform_modules(db, None)
+        from app.services.features import sync_feature_catalog
+        added = sync_feature_catalog(db, aid)
+        if added:
+            print(f"  + synced {added} feature requirements")
 
         admin = db.query(m.User).filter(m.User.is_super_admin == True).first()
         aid = admin.id if admin else None

@@ -68,6 +68,7 @@ def list_expanded_api_catalog(ctx: AuthContext = Depends(require_tenant)):
 def requirements_coverage(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
     from app.models import entities as m
     from app.data.module_catalog import MODULE_CATALOG
+    from app.services import features as feat_svc
 
     module_records = db.query(m.ModuleRecord).filter(
         m.ModuleRecord.tenant_id == ctx.tenant_id, m.ModuleRecord.is_deleted == False
@@ -75,16 +76,20 @@ def requirements_coverage(ctx: AuthContext = Depends(require_tenant), db: Sessio
     expanded_records = db.query(m.ExpandedResource).filter(
         m.ExpandedResource.tenant_id == ctx.tenant_id, m.ExpandedResource.is_deleted == False
     ).count()
+    cov = feat_svc.coverage_summary(db)
     return {
-        "feature_backlog_total": 3210,
-        "feature_backlog_must_have": 2303,
+        "feature_backlog_total": cov.get("target_total", 3210),
+        "feature_backlog_implemented": cov["implemented"],
+        "feature_backlog_percent": cov["percent"],
+        "feature_backlog_must_have": cov["must_have"],
+        "feature_backlog_must_have_implemented": cov["must_have_implemented"],
         "expanded_api_endpoints": TOTAL_EXPANDED_ENDPOINTS,
         "api_backlog_services": 34,
         "platform_modules": len(MODULE_CATALOG),
         "tenant_module_records": module_records,
         "tenant_expanded_records": expanded_records,
-        "implementation_model": "generic_module_records + expanded_resources + dedicated_mvp_routes",
-        "coverage_note": "All 500 expanded API paths and 34 API backlog services are routable; clinical features use module workflow records.",
+        "implementation_model": "dedicated_domain_desks + clinical_lifecycle_apis + feature_catalog",
+        "coverage_note": "3,210 Excel features tracked in PostgreSQL; core workflow stages wired to live APIs.",
     }
 
 

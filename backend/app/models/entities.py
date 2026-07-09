@@ -752,3 +752,20 @@ class OtProcedure(Base, AuditedMixin):
     __table_args__ = (
         Index("ix_ot_search", "tenant_id", "status", "scheduled_at"),
     )
+
+
+class FeatureRequirement(Base, AuditedMixin):
+    """Excel feature backlog row — synced from module catalog × workflow stages."""
+    __tablename__ = "feature_requirements"
+    feature_id = Column(String(32), unique=True, nullable=False, index=True)
+    module_code = Column(String(128), nullable=False, index=True)
+    submodule = Column(String(128), nullable=False)
+    workflow_stage = Column(String(64), nullable=False)
+    feature_name = Column(String(255), nullable=False)
+    platform = Column(String(32), default="Web")
+    priority = Column(String(32), default="Must Have")
+    api_route = Column(String(512))
+    implemented = Column(Boolean, default=False, nullable=False)
+    __table_args__ = (
+        Index("ix_feature_module", "module_code", "submodule", "workflow_stage"),
+    )

@@ -13,6 +13,7 @@ from app.api.v1.masters_router import router as masters_router
 from app.api.v1.emergency_router import router as emergency_router
 from app.api.v1.ot_router import router as ot_router
 from app.api.v1.dedicated_router import router as dedicated_router
+from app.api.v1.features_router import router as features_router
 from app.middleware.api_audit import ApiAuditMiddleware
 from app.db.session import Base, engine
 from app.models import entities as m
@@ -47,6 +48,7 @@ app.include_router(clinical_router, prefix="/api/v1")
 app.include_router(emergency_router, prefix="/api/v1")
 app.include_router(ot_router, prefix="/api/v1")
 app.include_router(dedicated_router, prefix="/api/v1")
+app.include_router(features_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
@@ -59,6 +61,9 @@ def on_startup():
     db = SessionLocal()
     try:
         sync_platform_modules(db, None)
+        db.commit()
+        from app.services.features import sync_feature_catalog
+        sync_feature_catalog(db, None)
         db.commit()
         tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
         if tenant:

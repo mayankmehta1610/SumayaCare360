@@ -17,6 +17,7 @@ type Phase = {
 export default function DashboardPage() {
   const [kpis, setKpis] = useState<Kpi[]>([]);
   const [phases, setPhases] = useState<Phase[]>([]);
+  const [coverage, setCoverage] = useState<{ percent: number; implemented: number; total: number } | null>(null);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [loadingDemo, setLoadingDemo] = useState(false);
@@ -27,12 +28,14 @@ export default function DashboardPage() {
   const isAdmin = session?.role_code === "TENANT_ADMIN" || session?.role_code === "SUPER_ADMIN";
 
   async function load() {
-    const [kpiData, flowData] = await Promise.all([
+    const [kpiData, flowData, cov] = await Promise.all([
       api<{ kpis: Kpi[] }>("/dashboard/summary"),
       api<{ phases: Phase[] }>("/platform/module-flow"),
+      api<{ percent: number; implemented: number; total: number }>("/platform/features/coverage"),
     ]);
     setKpis(kpiData.kpis);
     setPhases(flowData.phases);
+    setCoverage(cov);
   }
 
   useEffect(() => {
@@ -56,7 +59,12 @@ export default function DashboardPage() {
   return (
     <div>
       <h1 className="page-title">Operations dashboard</h1>
-      <p className="muted">All KPIs load from PostgreSQL · click to drill down</p>
+      <p className="muted">
+        All KPIs load from PostgreSQL · click to drill down
+        {coverage && (
+          <> · Excel feature coverage <strong>{coverage.percent}%</strong> ({coverage.implemented}/{coverage.total})</>
+        )}
+      </p>
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
 

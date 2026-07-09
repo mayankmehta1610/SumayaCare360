@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
+import ModuleFlowBar from "../components/ModuleFlowBar";
+import ModuleFeaturePanel from "../components/ModuleFeaturePanel";
 
 export default function TelemedicinePage() {
   const [sessions, setSessions] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
   const [video, setVideo] = useState<any>(null);
   const [active, setActive] = useState<any>(null);
   const [patients, setPatients] = useState<any[]>([]);
@@ -10,16 +13,20 @@ export default function TelemedicinePage() {
   const [msg, setMsg] = useState("");
   const [patientId, setPatientId] = useState("");
   const [summary, setSummary] = useState("");
+  const [inCallNote, setInCallNote] = useState("");
+  const [createApptId, setCreateApptId] = useState("");
 
   async function load() {
-    const [s, v, p] = await Promise.all([
+    const [s, v, p, a] = await Promise.all([
       api<any[]>("/telemedicine/sessions"),
       api<any>("/video/providers"),
       api<any[]>("/patients"),
+      api<any[]>("/appointments"),
     ]);
     setSessions(s);
     setVideo(v);
     setPatients(p);
+    setAppointments(a.filter((x: any) => x.mode === "telemedicine"));
   }
 
   useEffect(() => {
@@ -42,6 +49,17 @@ export default function TelemedicinePage() {
     return consent.id;
   }
 
+  async function createSession(e: FormEvent) {
+    e.preventDefault();
+    if (!createApptId) return;
+    await api("/telemedicine/sessions", {
+      method: "POST",
+      body: JSON.stringify({ appointment_id: createApptId }),
+    });
+    setMsg("Telemedicine session created");
+    await load();
+  }
+
   async function join(sessionId: string) {
     let consentId: string | undefined;
     if (patientId) {
@@ -50,10 +68,30 @@ export default function TelemedicinePage() {
         await api(`/telemedicine/sessions/${sessionId}/link-consent?consent_id=${consentId}`, { method: "POST" });
       }
     }
-    const join = await api<any>(`/telemedicine/sessions/${sessionId}/join?as_role=provider`);
-    setActive(join);
+    const joinRes = await api<any>(`/telemedicine/sessions/${sessionId}/join?as_role=provider`);
+    setActive(joinRes);
     setMsg("Joined virtual room");
     await load();
+  }
+
+  async function waitingRoom(action: "admit" | "hold") {
+    if (!active?.session_id) return;
+    await api("/telemedicine/waiting-room", {
+      method: "POST",
+      body: JSON.stringify({ session_id: active.session_id, action }),
+    });
+    setMsg(action === "admit" ? "Patient admitted" : "Returned to waiting room");
+    await load();
+  }
+
+  async function saveInCallNote() {
+    if (!active?.session_id || !inCallNote) return;
+    await api("/telemedicine/in-call/notes", {
+      method: "POST",
+      body: JSON.stringify({ session_id: active.session_id, content: inCallNote, note_type: "clinical" }),
+    });
+    setInCallNote("");
+    setMsg("In-call note saved");
   }
 
   async function finish() {
@@ -68,13 +106,30 @@ export default function TelemedicinePage() {
 
   return (
     <div>
+      <ModuleFlowBar moduleCode="telemedicine-and-virtual-care" compact />
       <h1 className="page-title">Telemedicine</h1>
+      <ModuleFeaturePanel moduleCode="telemedicine-and-virtual-care" />
       <p className="muted">
         Provider: {video?.tenant_config?.provider_code || "—"} · Recording:{" "}
         {video?.tenant_config?.recording_enabled ? "enabled" : "off"}
       </p>
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
+      <form className="card" onSubmit={(e) => createSession(e).catch((err) => setError(err.message))} style={{ marginBottom: "1rem" }}>
+        <h3 style={{ marginTop: 0 }}>Create session from telemedicine appointment</h3>
+        <div className="field">
+          <label>Appointment</label>
+          <select required value={createApptId} onChange={(e) => setCreateApptId(e.target.value)}>
+            <option value="">Select telemedicine appointment</option>
+            {appointments.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.queue_token} — {new Date(a.scheduled_at).toLocaleString()} ({a.status})
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="submit">Create video session</button>
+      </form>
       <div className="grid-2">
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Sessions</h3>
@@ -115,9 +170,6 @@ export default function TelemedicinePage() {
               </tbody>
             </table>
           </div>
-          <p className="muted" style={{ fontSize: "0.85rem" }}>
-            Book a telemedicine appointment first — session is created automatically.
-          </p>
         </div>
         <div className="card">
           <div className="tele-room">
@@ -128,6 +180,10 @@ export default function TelemedicinePage() {
                 <p>Token: {active.join_token}</p>
                 <p>Provider adapter: {active.provider}</p>
                 <p>Recording allowed: {active.recording_allowed ? "Yes" : "No (consent required)"}</p>
+                <div className="actions">
+                  <button type="button" onClick={() => waitingRoom("admit").catch((e) => setError(e.message))}>Admit from waiting room</button>
+                  <button type="button" className="secondary" onClick={() => waitingRoom("hold").catch((e) => setError(e.message))}>Hold in waiting room</button>
+                </div>
               </div>
             ) : (
               <div>
@@ -139,6 +195,11 @@ export default function TelemedicinePage() {
           {active && (
             <div style={{ marginTop: "1rem" }}>
               <div className="field">
+                <label>In-call note</label>
+                <textarea rows={2} value={inCallNote} onChange={(e) => setInCallNote(e.target.value)} />
+              </div>
+              <button type="button" className="secondary" onClick={() => saveInCallNote().catch((e) => setError(e.message))}>Save note</button>
+              <div className="field" style={{ marginTop: "0.75rem" }}>
                 <label>Post-call summary</label>
                 <textarea rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />
               </div>

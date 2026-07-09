@@ -46,9 +46,11 @@ def list_records(
     *,
     submodule: Optional[str] = None,
     status: Optional[str] = None,
+    query: str = "",
 ) -> list[m.ModuleRecord]:
     if module_code not in DOMAIN_MODULES:
         raise HTTPException(404, f"No dedicated domain config for {module_code}")
+    from sqlalchemy import or_
     q = db.query(m.ModuleRecord).filter(
         m.ModuleRecord.tenant_id == tenant_id,
         m.ModuleRecord.module_code == module_code,
@@ -58,6 +60,9 @@ def list_records(
         q = q.filter(m.ModuleRecord.submodule == submodule)
     if status:
         q = q.filter(m.ModuleRecord.status == status)
+    if query:
+        like = f"%{query}%"
+        q = q.filter(or_(m.ModuleRecord.title.ilike(like), m.ModuleRecord.reference_no.ilike(like)))
     return q.order_by(m.ModuleRecord.created_at.desc()).limit(200).all()
 
 
@@ -139,3 +144,61 @@ def transition_record(
         correlation_id=correlation_id,
     )
     return row
+
+
+def update_record(
+    db: Session,
+    row: m.ModuleRecord,
+    *,
+    title: Optional[str] = None,
+    payload: Optional[dict[str, Any]] = None,
+    actor_id: UUID,
+    correlation_id: Optional[str] = None,
+) -> m.ModuleRecord:
+    old = {"title": row.title, "payload": row.payload}
+    if title is not None:
+        row.title = title
+    if payload is not None:
+        row.payload = {**(row.payload or {}), **payload}
+    row.updated_by = actor_id
+    write_audit(
+        db, tenant_id=row.tenant_id, actor_user_id=actor_id, action="dedicated.update",
+        entity_type=row.module_code, entity_id=row.id,
+        old_values=old, new_values={"title": row.title},
+        correlation_id=correlation_id,
+    )
+    return row
+
+
+def soft_delete_record(
+    db: Session,
+    row: m.ModuleRecord,
+    *,
+    actor_id: UUID,
+    correlation_id: Optional[str] = None,
+) -> None:
+    row.is_deleted = True
+    row.updated_by = actor_id
+    write_audit(
+        db, tenant_id=row.tenant_id, actor_user_id=actor_id, action="dedicated.delete",
+        entity_type=row.module_code, entity_id=row.id,
+        correlation_id=correlation_id,
+    )
+
+
+def export_records(rows: list[m.ModuleRecord]) -> dict:
+    return {
+        "format": "json",
+        "count": len(rows),
+        "records": [
+            {
+                "id": str(r.id),
+                "reference_no": r.reference_no,
+                "submodule": r.submodule,
+                "title": r.title,
+                "status": r.status,
+                "payload": r.payload,
+            }
+            for r in rows
+        ],
+    }

@@ -75,6 +75,25 @@ export default function AppointmentsPage() {
     }
   }
 
+  async function callNext(id: string) {
+    try {
+      await api(`/queue/tokens/${id}/status?status=in_progress`, { method: "PATCH" });
+      setMsg("Patient called to counter");
+      await load();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
+  async function completeQueue(id: string) {
+    try {
+      await api(`/queue/tokens/${id}/status?status=completed`, { method: "PATCH" });
+      await load();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div>
       <ModuleFlowBar moduleCode="appointment-and-queue-management" compact />
@@ -130,7 +149,9 @@ export default function AppointmentsPage() {
                   <td><span className="badge">{r.status}</span></td>
                   <td className="actions">
                     <button type="button" className="secondary" onClick={() => setStatus(r.id, "checked_in")}>Check in</button>
+                    <button type="button" className="secondary" onClick={() => callNext(r.id)}>Call next</button>
                     <button type="button" onClick={() => startEncounter(r.id)}>Start encounter</button>
+                    <button type="button" className="secondary" onClick={() => completeQueue(r.id)}>Complete</button>
                     <button type="button" className="secondary" onClick={() => setStatus(r.id, "cancelled")}>Cancel</button>
                     <button type="button" className="secondary" onClick={() => setStatus(r.id, "no_show")}>No show</button>
                   </td>
