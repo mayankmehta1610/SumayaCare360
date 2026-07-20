@@ -86,6 +86,9 @@ export default function CareJourneyPage() {
 
   async function bookAppointment(e: FormEvent) {
     e.preventDefault();
+    const provider = providers.find((x) => x.id === apptForm.provider_id);
+    const patient = patients.find((x) => x.id === patientId);
+    if (!provider?.department_id) throw new Error("Selected provider must be assigned to a department master");
     const res = await api<{ id: string }>("/appointments", {
       method: "POST",
       body: JSON.stringify({
@@ -93,6 +96,12 @@ export default function CareJourneyPage() {
         ...apptForm,
         scheduled_at: new Date(apptForm.scheduled_at).toISOString(),
       }),
+        booking_profile: {
+          visit_type: "new_consultation", department_id: provider.department_id,
+          priority: "routine", duration_minutes: 30, referral_source: "internal",
+          payer_type: patient?.registration_profile?.payer_type || "self_pay",
+          callback_phone: patient?.phone || "not_available",
+        },
     });
     setAppointmentId(res.id);
     setMsg(`Appointment booked — token will be assigned`);

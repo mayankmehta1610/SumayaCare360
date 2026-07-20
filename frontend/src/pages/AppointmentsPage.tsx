@@ -10,6 +10,7 @@ export default function AppointmentsPage() {
   const [rows, setRows] = useState<any[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
   const [providers, setProviders] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({
@@ -19,7 +20,7 @@ export default function AppointmentsPage() {
     mode: "in_person",
     reason: "",
     visit_type: "new_consultation",
-    department_code: "general_medicine",
+    department_id: "",
     priority: "routine",
     duration_minutes: "30",
     referral_source: "self",
@@ -29,14 +30,16 @@ export default function AppointmentsPage() {
   });
 
   async function load() {
-    const [a, p, pr] = await Promise.all([
+    const [a, p, pr, d] = await Promise.all([
       api<any[]>("/appointments"),
       fetchPatients(),
       api<any[]>("/providers"),
+      api<any[]>("/admin/departments"),
     ]);
     setRows(a);
     setPatients(p);
     setProviders(pr);
+    setDepartments(d);
   }
 
   useEffect(() => {
@@ -51,13 +54,13 @@ export default function AppointmentsPage() {
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     try {
-      const { visit_type, department_code, priority, duration_minutes, referral_source, payer_type, callback_phone, booking_notes, ...appointment } = form;
+      const { visit_type, department_id, priority, duration_minutes, referral_source, payer_type, callback_phone, booking_notes, ...appointment } = form;
       await api("/appointments", {
         method: "POST",
         body: JSON.stringify({
           ...appointment,
           scheduled_at: new Date(form.scheduled_at).toISOString(),
-          booking_profile: { visit_type, department_code, priority, duration_minutes: Number(duration_minutes), referral_source, payer_type, callback_phone, notes: booking_notes },
+          booking_profile: { visit_type, department_id, priority, duration_minutes: Number(duration_minutes), referral_source, payer_type, callback_phone, notes: booking_notes },
         }),
       });
       setMsg("Appointment booked");
@@ -122,11 +125,12 @@ export default function AppointmentsPage() {
               {patients.map((p) => <option key={p.id} value={p.id}>{p.mrn} — {p.first_name} {p.last_name}</option>)}
             </select>
           </div>
+          <div className="field"><label>Department (master)</label><select required value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value, provider_id: "" })}><option value="">Select department</option>{departments.map((x) => <option key={x.id} value={x.id}>{x.code} ? {x.name}</option>)}</select></div>
           <div className="field">
             <label>Provider</label>
             <select required value={form.provider_id} onChange={(e) => setForm({ ...form, provider_id: e.target.value })}>
               <option value="">Select</option>
-              {providers.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+              {providers.filter((p) => p.department_id === form.department_id).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
             </select>
           </div>
           <div className="field">
@@ -146,7 +150,6 @@ export default function AppointmentsPage() {
           </div>
           <div className="grid-2">
             <div className="field"><label>Visit type *</label><select required value={form.visit_type} onChange={(e) => setForm({ ...form, visit_type: e.target.value })}><option value="new_consultation">New consultation</option><option value="follow_up">Follow-up</option><option value="procedure">Procedure</option><option value="diagnostic">Diagnostic</option><option value="preventive">Preventive care</option></select></div>
-            <div className="field"><label>Department *</label><select required value={form.department_code} onChange={(e) => setForm({ ...form, department_code: e.target.value })}><option value="general_medicine">General medicine</option><option value="paediatrics">Paediatrics</option><option value="obstetrics_gynaecology">Obstetrics and gynaecology</option><option value="orthopaedics">Orthopaedics</option><option value="cardiology">Cardiology</option><option value="surgery">Surgery</option><option value="diagnostics">Diagnostics</option></select></div>
             <div className="field"><label>Priority *</label><select required value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option value="routine">Routine</option><option value="urgent">Urgent</option><option value="priority">Priority / vulnerable patient</option></select></div>
             <div className="field"><label>Planned duration (minutes) *</label><input required type="number" min="5" max="480" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} /></div>
             <div className="field"><label>Referral source *</label><select required value={form.referral_source} onChange={(e) => setForm({ ...form, referral_source: e.target.value })}><option value="self">Self / walk-in</option><option value="internal">Internal referral</option><option value="external_provider">External provider</option><option value="camp">Health camp</option><option value="online">Online</option></select></div>

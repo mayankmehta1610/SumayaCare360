@@ -23,7 +23,7 @@ const RESOURCES = [
   "beds",
 ];
 
-const CREATABLE = new Set(["tariffs", "medicines", "lab-tests", "room-categories", "beds", "insurance-payers", "diseases", "notification-templates"]);
+const CREATABLE = new Set(["tariffs", "medicines", "lab-tests", "room-categories", "insurance-payers", "diseases", "notification-templates"]);
 
 type CreateForm = {
   code: string;
@@ -57,6 +57,11 @@ export default function MastersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [catalog, setCatalog] = useState<any[]>([]);
+
+  useEffect(() => {
+    api<{ items: any[] }>("/admin/master-data-catalog").then((x) => setCatalog(x.items)).catch(() => setCatalog([]));
+  }, []);
 
   async function loadRows(res: string) {
     const data = await api<any[]>(`/masters/${res}`);
@@ -127,9 +132,16 @@ export default function MastersPage() {
   return (
     <div>
       <h1 className="page-title">Configuration masters</h1>
-      <p className="muted">No hard-coded business dropdowns — values load from PostgreSQL.</p>
+      <p className="muted">Governed source records, relationships and downstream use—not disconnected text values.</p>
       {error && <div className="error">{error}</div>}
       {msg && <div className="success">{msg}</div>}
+      <div className="card table-wrap" style={{ marginBottom: "1rem" }}>
+        <h3 style={{ marginTop: 0 }}>Master-data governance map</h3>
+        <p className="muted">Use free text only for clinical narrative and notes. Identifiers, classifications, people, services and physical locations must come from masters.</p>
+        <table><thead><tr><th>Domain</th><th>Master</th><th>Depends on</th><th>Used by</th></tr></thead>
+          <tbody>{catalog.map((x, i) => <tr key={`${x.domain}-${x.master}-${i}`}><td>{x.domain}</td><td><strong>{x.master}</strong></td><td>{x.depends_on}</td><td>{x.used_by}</td></tr>)}</tbody>
+        </table>
+      </div>
       <div className="card">
         <div className="field">
           <label>Master resource</label>
@@ -169,6 +181,8 @@ export default function MastersPage() {
                         <option value="lab">lab</option>
                         <option value="inpatient">inpatient</option>
                         <option value="imaging">imaging</option>
+                        <option value="procedure">procedure</option>
+                        <option value="surgery">surgery</option>
                       </select>
                     </div>
                     <div className="field">

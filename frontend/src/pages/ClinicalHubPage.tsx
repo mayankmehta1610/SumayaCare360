@@ -18,7 +18,6 @@ export default function ClinicalHubPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [labForm, setLabForm] = useState({ patient_id: "", test_code: "" });
-  const [ipdForm, setIpdForm] = useState({ patient_id: "", bed_code: "" });
   const [claimForm, setClaimForm] = useState({ patient_id: "", payer_code: "", amount: "1000", policy_no: "" });
 
   async function load() {
@@ -51,14 +50,6 @@ export default function ClinicalHubPage() {
       body: JSON.stringify({ patient_id: labForm.patient_id, test_code: labForm.test_code }),
     });
     setMsg("Lab order created");
-    await load();
-  }
-
-  async function admit(e: FormEvent) {
-    e.preventDefault();
-    const q = new URLSearchParams({ patient_id: ipdForm.patient_id, bed_code: ipdForm.bed_code });
-    await api(`/clinical/ipd-admissions?${q}`, { method: "POST" });
-    setMsg("Patient admitted");
     await load();
   }
 
@@ -115,22 +106,12 @@ export default function ClinicalHubPage() {
           </div>
           <button type="submit">Order test</button>
         </form>
-        <form className="card" onSubmit={(e) => admit(e).catch((err) => setError(err.message))}>
+        <div className="card">
           <h3 style={{ marginTop: 0 }}>IPD admission</h3>
-          <div className="field"><label>Patient</label>
-            <select required value={ipdForm.patient_id} onChange={(e) => setIpdForm({ ...ipdForm, patient_id: e.target.value })}>
-              <option value="">Select</option>
-              {patients.map((p) => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
-            </select>
-          </div>
-          <div className="field"><label>Bed (master)</label>
-            <select required value={ipdForm.bed_code} onChange={(e) => setIpdForm({ ...ipdForm, bed_code: e.target.value })}>
-              <option value="">Select</option>
-              {beds.map((b) => <option key={b.id} value={b.bed_code}>{b.bed_code} · {b.room_code}</option>)}
-            </select>
-          </div>
-          <button type="submit">Admit</button>
-        </form>
+          <p><strong>{beds.length}</strong> governed beds currently available.</p>
+          <p className="muted">Admissions now use the complete workflow: patient, linked ward/room/bed, diagnosis master and required clinical details.</p>
+          <Link to={`${prefix}/inpatient`} className="button-link">Open complete admission workflow</Link>
+        </div>
         <form className="card" onSubmit={(e) => submitClaim(e).catch((err) => setError(err.message))}>
           <h3 style={{ marginTop: 0 }}>Insurance claim</h3>
           <div className="field"><label>Patient</label>

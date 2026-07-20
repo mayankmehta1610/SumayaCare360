@@ -15,6 +15,7 @@ from app.api.v1.ot_router import router as ot_router
 from app.api.v1.dedicated_router import router as dedicated_router
 from app.api.v1.features_router import router as features_router
 from app.api.v1.patient_admin_router import router as patient_admin_router
+from app.api.v1.facility_router import router as facility_router
 from app.middleware.api_audit import ApiAuditMiddleware
 from app.db.session import Base, engine
 from app.models import entities as m
@@ -51,6 +52,7 @@ app.include_router(ot_router, prefix="/api/v1")
 app.include_router(dedicated_router, prefix="/api/v1")
 app.include_router(features_router, prefix="/api/v1")
 app.include_router(patient_admin_router, prefix="/api/v1")
+app.include_router(facility_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
@@ -70,6 +72,9 @@ def on_startup():
         tenant = db.query(m.Tenant).filter(m.Tenant.tenant_code == "demo").first()
         if tenant:
             ensure_demo_data(db)
+        from app.services.facility_master import ensure_facility_hierarchy
+        ensure_facility_hierarchy(db)
+        db.commit()
     except Exception as exc:
         import traceback
         print(f"Startup seed warning: {exc}")

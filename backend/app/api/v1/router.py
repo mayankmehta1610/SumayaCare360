@@ -597,8 +597,17 @@ def list_providers(ctx: AuthContext = Depends(require_tenant), db: Session = Dep
 
 @router.post("/providers", response_model=ProviderOut)
 def create_provider(payload: ProviderCreate, ctx: AuthContext = Depends(require_permission("providers:*")), db: Session = Depends(get_db)):
+    branch = db.query(m.Branch).filter(m.Branch.id == payload.branch_id, m.Branch.tenant_id == ctx.tenant_id).first()
+    department = db.query(m.Department).filter(m.Department.id == payload.department_id, m.Department.tenant_id == ctx.tenant_id).first()
+    location = db.query(m.FacilityLocation).filter(m.FacilityLocation.id == payload.primary_location_id, m.FacilityLocation.tenant_id == ctx.tenant_id).first()
+    specialty = db.query(m.Specialty).filter(m.Specialty.code == payload.specialty_code, or_(m.Specialty.tenant_id == ctx.tenant_id, m.Specialty.tenant_id.is_(None))).first()
+    if not branch or not department or not location or not specialty:
+        raise HTTPException(400, "Select valid branch, department, location and specialty masters")
+    if department.branch_id != branch.id or location.branch_id != branch.id:
+        raise HTTPException(400, "Provider department and location must belong to the selected branch")
     row = m.Provider(
         tenant_id=ctx.tenant_id, branch_id=payload.branch_id,
+        department_id=payload.department_id, primary_location_id=payload.primary_location_id,
         code=payload.code, full_name=payload.full_name,
         specialty_code=payload.specialty_code, license_no=payload.license_no,
         consultation_fee_code=payload.consultation_fee_code,
@@ -659,9 +668,18 @@ def create_appointment(payload: AppointmentCreate, ctx: AuthContext = Depends(re
     provider = db.query(m.Provider).filter(m.Provider.id == payload.provider_id, m.Provider.tenant_id == ctx.tenant_id).first()
     if not patient or not provider:
         raise HTTPException(404, "Patient or provider not found in tenant")
+    department_id = payload.booking_profile.get("department_id")
+    department = db.query(m.Department).filter(
+        m.Department.id == department_id, m.Department.tenant_id == ctx.tenant_id,
+        m.Department.is_deleted == False,
+    ).first()
+    if not department:
+        raise HTTPException(400, "Select a valid department master")
+    if provider.department_id and str(provider.department_id) != str(department.id):
+        raise HTTPException(400, "Selected provider is not assigned to this department")
     token_n = db.query(m.Appointment).filter(m.Appointment.tenant_id == ctx.tenant_id).count() + 1
     row = m.Appointment(
-        tenant_id=ctx.tenant_id, branch_id=payload.branch_id,
+        tenant_id=ctx.tenant_id, branch_id=department.branch_id or provider.branch_id,
         patient_id=payload.patient_id, provider_id=payload.provider_id,
         scheduled_at=payload.scheduled_at, mode=payload.mode, reason=payload.reason,
         booking_profile=payload.booking_profile,
