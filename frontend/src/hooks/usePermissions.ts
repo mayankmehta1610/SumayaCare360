@@ -22,12 +22,18 @@ export function canWrite(session: Session | null, resource = "masters"): boolean
   return hasWriteOnResource(session, resource);
 }
 
-/** Platform module desks — tenant/branch admins and anyone with masters write. */
+/** Platform module desks — staff with any operational write grant. */
 export function canWriteWorkspace(session: Session | null): boolean {
   if (!session) return false;
   if (session.role_code === "PATIENT") return false;
   if (ADMIN_ROLES.has(session.role_code)) return true;
-  return canWrite(session, "masters") || canWrite(session, "encounters") || canWrite(session, "billing");
+  return session.permissions.some((permission) => {
+    if (permission === "*") return true;
+    const separator = permission.indexOf(":");
+    if (separator < 0) return false;
+    const action = permission.slice(separator + 1);
+    return action === "*" || !READ_ONLY_ACTIONS.has(action);
+  });
 }
 
 /** Order labs/imaging from clinical roles (doctor) or department staff. */
