@@ -15,7 +15,7 @@ def nav_label(name: str) -> str:
 
 # Every routable screen in the tenant app (excludes /tenants — super-admin only)
 ALL_TENANT_ROUTES: frozenset[str] = frozenset({
-    "/dashboard", "/demo-tour", "/module-map", "/care-journey",
+    "/dashboard", "/demo-tour", "/module-map", "/care-journey", "/patient-administration",
     "/patients", "/providers", "/appointments", "/encounters", "/telemedicine",
     "/billing", "/masters", "/audit", "/administration", "/identity-security",
     "/rooms-facilities", "/documents", "/location-services", "/clinical-hub",
@@ -47,19 +47,19 @@ ROLE_HOME_ROUTE: dict[str, str] = {
 # Explicit allow-list per role — no wildcards, no inference
 ROLE_ALLOWED_ROUTES: dict[str, frozenset[str]] = {
     "BRANCH_ADMIN": frozenset({
-        "/dashboard", "/patients", "/providers", "/appointments",
+        "/dashboard", "/patient-administration", "/patients", "/providers", "/appointments",
         "/billing", "/reports", "/masters", "/settings/mfa",
     }),
     "DOCTOR": frozenset({
-        "/dashboard", "/patients", "/appointments", "/encounters", "/telemedicine",
+        "/dashboard", "/patient-administration", "/patients", "/appointments", "/encounters", "/telemedicine",
         "/care-journey", "/laboratory", "/radiology", "/pharmacy", "/settings/mfa",
     }),
     "NURSE": frozenset({
-        "/dashboard", "/patients", "/encounters", "/nursing", "/inpatient",
+        "/dashboard", "/patient-administration", "/patients", "/encounters", "/nursing", "/inpatient",
         "/care-journey", "/settings/mfa",
     }),
     "RECEPTIONIST": frozenset({
-        "/dashboard", "/patients", "/appointments", "/emergency", "/providers", "/settings/mfa",
+        "/dashboard", "/patient-administration", "/patients", "/appointments", "/emergency", "/providers", "/settings/mfa",
     }),
     "BILLING_STAFF": frozenset({
         "/dashboard", "/patients", "/billing", "/insurance-claims",
@@ -80,23 +80,28 @@ ROLE_ALLOWED_ROUTES: dict[str, frozenset[str]] = {
 ROLE_TOP_LINKS: dict[str, list[dict[str, str]]] = {
     "TENANT_ADMIN": [
         {"to": "/dashboard", "label": "Dashboard"},
+        {"to": "/patient-administration", "label": "Patient administration"},
         {"to": "/demo-tour", "label": "Demo tour"},
         {"to": "/module-map", "label": "Module map"},
     ],
     "BRANCH_ADMIN": [
         {"to": "/dashboard", "label": "Dashboard"},
+        {"to": "/patient-administration", "label": "Patient administration"},
         {"to": "/reports", "label": "Reports"},
     ],
     "DOCTOR": [
         {"to": "/dashboard", "label": "Dashboard"},
+        {"to": "/patient-administration", "label": "Patient administration"},
         {"to": "/care-journey", "label": "Care journey"},
     ],
     "NURSE": [
         {"to": "/dashboard", "label": "Dashboard"},
+        {"to": "/patient-administration", "label": "Patient administration"},
         {"to": "/care-journey", "label": "Care journey"},
     ],
     "RECEPTIONIST": [
         {"to": "/dashboard", "label": "Dashboard"},
+        {"to": "/patient-administration", "label": "Patient administration"},
     ],
     "BILLING_STAFF": [
         {"to": "/dashboard", "label": "Dashboard"},

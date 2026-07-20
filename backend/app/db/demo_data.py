@@ -11,10 +11,42 @@ from sqlalchemy.orm import Session
 
 from app.data.domain_lifecycles import DOMAIN_MODULES, get_domain_meta
 from app.data.module_catalog import MODULE_CATALOG
+from app.data.demo_clinical_profiles import demo_clinical_profile
 from app.models import entities as m
 
 NOW = datetime.now(timezone.utc)
 DEMO_PATIENT_MRN = "DEMO-001"
+
+
+def _demo_operational_payload(meta: dict, submodule: str, sequence: int) -> dict:
+    """Generate field-complete replay data from the same contract used by the UI and API."""
+    fields = (meta.get("fields_by_submodule") or {}).get(submodule, [])
+    values: dict = {}
+    for field in fields:
+        key = field["key"]
+        field_type = field.get("type", "text")
+        options = field.get("options") or []
+        label = field.get("label", key)
+        if field_type == "select" and options:
+            values[key] = options[sequence % len(options)]
+        elif field_type == "checkbox":
+            values[key] = sequence % 2 == 0
+        elif field_type == "number":
+            values[key] = 10 + sequence
+        elif field_type == "date":
+            values[key] = (NOW + timedelta(days=sequence + 1)).date().isoformat()
+        elif field_type == "datetime":
+            values[key] = (NOW + timedelta(hours=sequence + 1)).isoformat()
+        elif field_type == "tel":
+            values[key] = f"9876500{sequence:03d}"
+        elif field_type == "url":
+            values[key] = f"https://demo.sumayacare360.example/{key}"
+        elif field_type == "textarea":
+            values[key] = f"Verified demo notes for {label.lower()}."
+        else:
+            values[key] = f"Demo {label.lower()} {sequence + 1}"
+    values.setdefault("description", f"Field-complete replay data for {meta['name']}")
+    return values
 
 
 def _aid(db: Session, tenant_id: UUID) -> UUID:
@@ -94,7 +126,15 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
             tenant_id=tenant.id, branch_id=branch.id, mrn=mrn,
             first_name=fn, last_name=ln, gender_code=g, date_of_birth=dob,
             phone=phone, email=email, blood_group="O+", status="active",
-            address="Mumbai, Maharashtra", created_by=actor, updated_by=actor,
+            national_id=f"DEMO-ID-{mrn[-3:]}",
+            emergency_contact={"name": f"{fn} Family Contact", "relation": "Family", "phone": "9876599999"},
+            registration_profile={
+                "nationality_code": "IN", "preferred_language": "English", "address_line_1": "12 Care Avenue",
+                "city": "Mumbai", "state": "Maharashtra", "postal_code": "400001", "country_code": "IN",
+                "id_type": "aadhaar", "payer_type": "self_pay", "allergies": "None known",
+                "chronic_conditions": "None known", "disability_or_support_needs": "None", "registration_source": "walk_in",
+                "communication_preference": "sms", "consent": {"privacy_notice": True, "general_treatment": True, "communications": True},
+            },
         )
         db.add(p)
         patients.append(p)
@@ -110,6 +150,11 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
             mode="in_person" if i % 3 else "telemedicine",
             status=["scheduled", "checked_in", "completed", "scheduled", "no_show", "completed", "checked_in", "scheduled"][i % 8],
             reason=["Fever", "Follow-up HTN", "Back pain", "Diabetes review", "Skin rash", "Cough", "Antenatal", "Post-op"][i % 8],
+            booking_profile={
+                "visit_type": "follow_up" if i % 2 else "new_consultation", "department_code": "general_medicine",
+                "priority": "urgent" if i == 0 else "routine", "duration_minutes": 30,
+                "referral_source": "self", "payer_type": "self_pay", "callback_phone": p.phone,
+            },
             queue_token=f"T{i+101:03d}",
             created_by=actor, updated_by=actor,
         )
@@ -165,6 +210,7 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
             result_value="12.5 g/dL" if lab_statuses[i % len(lab_statuses)] in ("result_entered", "verified", "critical_alert") else None,
             result_notes="Within range" if i % 5 != 4 else "Critical low Hb",
             critical_flag=(lab_statuses[i % len(lab_statuses)] == "critical_alert"),
+            order_profile=demo_clinical_profile("laboratory", i),
             created_by=actor, updated_by=actor,
         ))
 
@@ -178,6 +224,7 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
             order_no=f"RAD-{i+1:06d}", study_code=rad_studies[i % len(rad_studies)], status=st,
             report_text="No acute findings" if st == "reported" else None,
             scheduled_at=NOW + timedelta(hours=2) if st == "scheduled" else None,
+            order_profile=demo_clinical_profile("radiology", i),
             created_by=actor, updated_by=actor,
         ))
 
@@ -188,6 +235,7 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
             tenant_id=tenant.id, patient_id=p.id,
             dispense_no=f"RX-{i+1:06d}", medicine_code="PARA500", qty=10,
             status=st, created_by=actor, updated_by=actor,
+            dispense_profile=demo_clinical_profile("pharmacy", i),
         ))
 
     # ── Prescriptions ──
@@ -215,6 +263,7 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
         admission_no="ADM-000001", bed_code=bed.bed_code if bed else "B201",
         ward_code="GEN", status="admitted", diagnosis_code="DM2",
         admitted_at=NOW - timedelta(days=2),
+        admission_profile=demo_clinical_profile("ipd"),
         created_by=actor, updated_by=actor,
     )
     db.add(ipd)
@@ -224,6 +273,7 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
             tenant_id=tenant.id, patient_id=patients[4].id, admission_id=ipd.id,
             task_type=task_type, status=st, description=f"Demo {task_type}",
             assigned_to=nurse.id if nurse else None,
+            care_profile=demo_clinical_profile("nursing", ["vitals_check", "medication_admin", "wound_care"].index(task_type)),
             created_by=actor, updated_by=actor,
         ))
 
@@ -236,6 +286,7 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
             esi_level=esi, status=st,
             disposition="admit" if st == "disposition" else None,
             arrived_at=NOW - timedelta(hours=i + 1),
+            clinical_profile=demo_clinical_profile("emergency", i),
             created_by=actor, updated_by=actor,
         ))
 
@@ -247,6 +298,7 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
             procedure_name="Appendectomy", theatre_code="OT-1", status=st,
             scheduled_at=NOW + timedelta(days=i),
             pre_op_checklist={"consent": True, "labs_ok": True, "npo": st != "scheduled"},
+            procedure_profile=demo_clinical_profile("operation_theatre", i),
             created_by=actor, updated_by=actor,
         ))
 
@@ -301,6 +353,7 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
             amount=Decimal(str(5000 + i * 1000)),
             policy_no=f"POL-DEMO-{i+1:04d}",
             pre_auth_no=f"PA-{i+1:06d}" if st != "draft" else None,
+            claim_profile=demo_clinical_profile("insurance_claim", i),
             created_by=actor, updated_by=actor,
         ))
 
@@ -348,8 +401,8 @@ def seed_demo_replay(db: Session, *, force: bool = False) -> None:
                     tenant_id=tenant.id, module_code=code, submodule=sub,
                     reference_no=f"DEMO-{code[:6].upper()}-{j+1:02d}{k+1}",
                     title=f"Demo {sub} — item {k+1}", status=st,
-                    patient_id=patients[(j + k) % len(patients)].id,
-                    payload={"description": f"Replay data for {meta['name']}", "priority": "medium"},
+                    patient_id=patients[(j + k) % len(patients)].id if meta.get("requires_patient") else None,
+                    payload=_demo_operational_payload(meta, sub, k),
                     created_by=actor, updated_by=actor,
                 ))
 

@@ -4,6 +4,7 @@ import { api } from "../../api/client";
 import { fetchPatients } from "../../api/list";
 import ClinicalListDesk from "../../components/ClinicalListDesk";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
+import ClinicalProfileFields, { createClinicalProfile } from "../../components/ClinicalProfileFields";
 import { useAuth } from "../../context/AuthContext";
 import { canOrderClinical, canWrite } from "../../hooks/usePermissions";
 
@@ -28,6 +29,7 @@ export default function LaboratoryPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ patient_id: "", test_code: "" });
+  const [orderProfile, setOrderProfile] = useState(() => createClinicalProfile("laboratory"));
   const [resultForm, setResultForm] = useState({ orderId: "", result_value: "", result_notes: "", critical_flag: false });
   const [deskKey, setDeskKey] = useState(0);
 
@@ -51,7 +53,7 @@ export default function LaboratoryPage() {
     e.preventDefault();
     await api("/clinical/lab-orders", {
       method: "POST",
-      body: JSON.stringify({ patient_id: form.patient_id, test_code: form.test_code }),
+        body: JSON.stringify({ patient_id: form.patient_id, test_code: form.test_code, order_profile: orderProfile }),
     });
     setMsg("Lab order created");
     setForm({ patient_id: "", test_code: "" });
@@ -128,6 +130,7 @@ export default function LaboratoryPage() {
               </select>
             </div>
             <button type="submit">Order test</button>
+          <ClinicalProfileFields type="laboratory" values={orderProfile} onChange={setOrderProfile} />
           </form>
 
           {write && (

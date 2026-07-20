@@ -53,6 +53,7 @@ def serialize_claim(row: m.InsuranceClaim, *, include_patient: bool = False) -> 
         "pre_auth_no": row.pre_auth_no,
         "policy_no": row.policy_no,
         "notes": row.notes,
+        "claim_profile": row.claim_profile or {},
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }
@@ -69,6 +70,7 @@ def create_claim(
     policy_no: str = "",
     notes: str = "",
     actor_id: UUID,
+    claim_profile: Optional[dict] = None,
     correlation_id: Optional[str] = None,
 ) -> m.InsuranceClaim:
     patient = db.query(m.Patient).filter(
@@ -90,6 +92,7 @@ def create_claim(
         amount=amount,
         policy_no=policy_no,
         notes=notes,
+        claim_profile=claim_profile or {},
         status="draft",
         created_by=actor_id,
         updated_by=actor_id,

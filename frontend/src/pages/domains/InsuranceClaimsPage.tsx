@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
+import ClinicalProfileFields, { createClinicalProfile } from "../../components/ClinicalProfileFields";
 
 type Claim = {
   id: string;
@@ -22,6 +23,7 @@ export default function InsuranceClaimsPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ patient_id: "", payer_code: "", amount: "1000", policy_no: "" });
+  const [claimProfile, setClaimProfile] = useState(() => createClinicalProfile("insurance_claim"));
 
   const patientMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -53,6 +55,7 @@ export default function InsuranceClaimsPage() {
         payer_code: form.payer_code,
         amount: Number(form.amount),
         policy_no: form.policy_no,
+        claim_profile: claimProfile,
       }),
     });
     setMsg("Claim created (draft)");
@@ -123,6 +126,7 @@ export default function InsuranceClaimsPage() {
           </div>
         </div>
         <div className="actions">
+        <ClinicalProfileFields type="insurance_claim" values={claimProfile} onChange={setClaimProfile} />
           <button type="submit">Create claim</button>
           <button type="button" className="secondary" onClick={() => preAuth().catch((e) => setError(e.message))}>Pre-auth check</button>
         </div>

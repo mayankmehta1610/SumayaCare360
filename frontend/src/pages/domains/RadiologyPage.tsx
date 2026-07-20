@@ -4,6 +4,7 @@ import { api } from "../../api/client";
 import { fetchPatients } from "../../api/list";
 import ClinicalListDesk from "../../components/ClinicalListDesk";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
+import ClinicalProfileFields, { createClinicalProfile } from "../../components/ClinicalProfileFields";
 import { useAuth } from "../../context/AuthContext";
 import { canDelete, canOrderClinical, canWrite } from "../../hooks/usePermissions";
 
@@ -30,6 +31,7 @@ export default function RadiologyPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ patient_id: "", study_code: "" });
+  const [orderProfile, setOrderProfile] = useState(() => createClinicalProfile("radiology"));
   const [reportId, setReportId] = useState("");
   const [reportText, setReportText] = useState("");
   const [pacsLink, setPacsLink] = useState("");
@@ -60,7 +62,7 @@ export default function RadiologyPage() {
     e.preventDefault();
     await api("/clinical/radiology-orders", {
       method: "POST",
-      body: JSON.stringify({ patient_id: form.patient_id, study_code: form.study_code }),
+        body: JSON.stringify({ patient_id: form.patient_id, study_code: form.study_code, order_profile: orderProfile }),
     });
     setMsg("Imaging order created");
     setDeskKey((k) => k + 1);
@@ -139,6 +141,7 @@ export default function RadiologyPage() {
               </select>
             </div>
             <button type="submit">Order imaging</button>
+          <ClinicalProfileFields type="radiology" values={orderProfile} onChange={setOrderProfile} />
           </form>
 
           {write && (

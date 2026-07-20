@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class TokenResponse(BaseModel):
@@ -70,10 +70,15 @@ class DepartmentOut(BaseModel):
 class PatientUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    date_of_birth: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
     gender_code: Optional[str] = None
     address: Optional[str] = None
+    blood_group: Optional[str] = None
+    national_id: Optional[str] = None
+    emergency_contact: Optional[dict[str, Any]] = None
+    registration_profile: Optional[dict[str, Any]] = None
     status: Optional[str] = None
 
 
@@ -153,17 +158,41 @@ class MasterItemCreate(BaseModel):
 
 
 class PatientCreate(BaseModel):
-    first_name: str
-    last_name: str
-    date_of_birth: Optional[str] = None
-    gender_code: Optional[str] = None
-    phone: Optional[str] = None
+    first_name: str = Field(min_length=2, max_length=128)
+    last_name: str = Field(min_length=1, max_length=128)
+    date_of_birth: str
+    gender_code: str
+    phone: str = Field(min_length=8, max_length=32)
     email: Optional[EmailStr] = None
-    address: Optional[str] = None
+    address: str = Field(min_length=8)
     blood_group: Optional[str] = None
-    national_id: Optional[str] = None
+    national_id: str = Field(min_length=4, max_length=64)
     branch_id: Optional[UUID] = None
-    emergency_contact: dict[str, Any] = Field(default_factory=dict)
+    emergency_contact: dict[str, Any]
+    registration_profile: dict[str, Any]
+
+    @model_validator(mode="after")
+    def validate_registration(self):
+        emergency_missing = [key for key in ("name", "relation", "phone") if not self.emergency_contact.get(key)]
+        profile_required = (
+            "nationality_code", "preferred_language", "address_line_1", "city", "state",
+            "postal_code", "country_code", "id_type", "payer_type", "allergies",
+            "chronic_conditions", "disability_or_support_needs", "registration_source",
+            "communication_preference", "consent",
+        )
+        profile_missing = [key for key in profile_required if not self.registration_profile.get(key)]
+        consent = self.registration_profile.get("consent") or {}
+        if not consent.get("privacy_notice"):
+            profile_missing.append("privacy_notice_consent")
+        if not consent.get("general_treatment"):
+            profile_missing.append("general_treatment_consent")
+        if self.registration_profile.get("payer_type") == "insurance":
+            for key in ("payer_code", "policy_no"):
+                if not self.registration_profile.get(key):
+                    profile_missing.append(key)
+        if emergency_missing or profile_missing:
+            raise ValueError(f"Missing registration fields: {', '.join(emergency_missing + profile_missing)}")
+        return self
 
 
 class PatientOut(BaseModel):
@@ -175,6 +204,11 @@ class PatientOut(BaseModel):
     gender_code: Optional[str]
     phone: Optional[str]
     email: Optional[str]
+    address: Optional[str]
+    blood_group: Optional[str]
+    national_id: Optional[str]
+    emergency_contact: dict[str, Any] = Field(default_factory=dict)
+    registration_profile: Optional[dict[str, Any]] = None
     status: str
 
     class Config:
@@ -214,8 +248,23 @@ class AppointmentCreate(BaseModel):
     provider_id: UUID
     scheduled_at: datetime
     mode: str = "in_person"
-    reason: Optional[str] = None
+    reason: str = Field(min_length=2, max_length=500)
     branch_id: Optional[UUID] = None
+    booking_profile: dict[str, Any]
+
+    @model_validator(mode="after")
+    def validate_booking_profile(self):
+        required = (
+            "visit_type", "department_code", "priority", "duration_minutes",
+            "referral_source", "payer_type", "callback_phone",
+        )
+        missing = [key for key in required if self.booking_profile.get(key) in (None, "")]
+        duration = self.booking_profile.get("duration_minutes")
+        if duration is not None and (not isinstance(duration, (int, float)) or duration < 5 or duration > 480):
+            raise ValueError("duration_minutes must be between 5 and 480")
+        if missing:
+            raise ValueError(f"Missing appointment fields: {', '.join(missing)}")
+        return self
 
 
 class AppointmentOut(BaseModel):
@@ -227,6 +276,7 @@ class AppointmentOut(BaseModel):
     status: str
     queue_token: Optional[str]
     reason: Optional[str]
+    booking_profile: Optional[dict[str, Any]] = None
 
     class Config:
         from_attributes = True

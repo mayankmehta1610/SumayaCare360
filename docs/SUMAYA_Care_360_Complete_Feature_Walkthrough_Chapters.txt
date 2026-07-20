@@ -1,0 +1,49 @@
+0:00  SUMAYA Care 360 - Complete Hospital Platform
+0:35  Role-aware hospital dashboard
+1:18  Patient administration command center
+2:01  Longitudinal Patient 360 record
+2:46  Patient registration and CRM
+3:30  Providers, specialties, and schedules
+4:08  Appointments, arrival, and queue management
+4:44  Emergency arrival and ESI triage
+5:22  End-to-end outpatient care journey
+6:03  Clinical encounters and medical documentation
+6:42  Telemedicine and virtual waiting room
+7:19  Inpatient admission and bed allocation
+7:57  Nursing worklist and care tasks
+8:33  Operation theatre and procedure management
+9:11  Laboratory order-to-result workflow
+9:49  Radiology, reporting, and PACS links
+10:29  Prescription validation and dispensing
+11:10  Rooms, beds, and facilities readiness
+11:51  Billing, invoices, and tokenized payments
+12:31  Insurance eligibility, pre-authorization, and claims
+13:11  Revenue cycle management
+13:46  Inventory, procurement, and stores
+14:27  Disease and care pathways
+15:01  Chronic disease programs
+15:35  Physiotherapy and rehabilitation
+16:07  Discharge and post-treatment continuity
+16:44  Women, child, and specialty care
+17:21  Ambulance and patient transport
+17:55  Diet, catering, and housekeeping
+18:31  Documents, consent, and clinical forms
+19:09  Notifications and patient engagement
+19:45  Patient portal experience
+20:18  Consent-gated location services
+20:54  Integrations and interoperability
+21:33  Data governance and platform operations
+22:13  Provider marketplace and onboarding
+22:48  Mobile application release operations
+23:23  Hospital and tenant administration
+24:01  Identity, roles, MFA, and access control
+24:44  Database-driven hospital masters
+25:21  Clinical, administrative, and API audit trail
+26:00  Seventeen live operational reports
+26:41  Complete module map and feature coverage
+27:12  Doctor workspace
+27:44  Nurse workspace
+28:14  Reception workspace
+28:44  Billing and insurance workspace
+29:16  Patient self-service workspace
+29:44  One connected hospital workflow

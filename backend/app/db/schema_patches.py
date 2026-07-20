@@ -7,6 +7,16 @@ import app.models.entities  # noqa: F401 — register models
 
 # (table, column, sqlite_type, postgres_type)
 SCHEMA_PATCHES: list[tuple[str, str, str, str]] = [
+    ("appointments", "booking_profile", "JSON", "JSONB DEFAULT '{}'::jsonb"),
+    ("triage_assessments", "clinical_profile", "JSON", "JSONB DEFAULT '{}'::jsonb"),
+    ("ipd_admissions", "admission_profile", "JSON", "JSONB DEFAULT '{}'::jsonb"),
+    ("nursing_tasks", "care_profile", "JSON", "JSONB DEFAULT '{}'::jsonb"),
+    ("lab_orders", "order_profile", "JSON", "JSONB DEFAULT '{}'::jsonb"),
+    ("radiology_orders", "order_profile", "JSON", "JSONB DEFAULT '{}'::jsonb"),
+    ("pharmacy_dispenses", "dispense_profile", "JSON", "JSONB DEFAULT '{}'::jsonb"),
+    ("ot_procedures", "procedure_profile", "JSON", "JSONB DEFAULT '{}'::jsonb"),
+    ("insurance_claims", "claim_profile", "JSON", "JSONB DEFAULT '{}'::jsonb"),
+    ("patients", "registration_profile", "JSON", "JSONB DEFAULT '{}'::jsonb"),
     ("users", "mfa_enabled", "BOOLEAN DEFAULT 0", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("users", "mfa_secret", "VARCHAR(128)", "VARCHAR(128)"),
     ("users", "correlation_id", "VARCHAR(64)", "VARCHAR(64)"),

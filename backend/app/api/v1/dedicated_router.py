@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.services import dedicated_domains as dom
 from app.services.pagination import page_response
 from app.services import features as feat_svc
+from app.data.domain_fields import validate_domain_payload
 
 router = APIRouter(prefix="/dedicated", tags=["dedicated-domains"])
 
@@ -85,13 +86,16 @@ def create_domain_record(
     db: Session = Depends(get_db),
 ):
     code = _check_module(module_code)
+    validated_payload = validate_domain_payload(
+        code, payload.submodule, payload.payload, patient_id=payload.patient_id,
+    )
     row = dom.create_record(
         db,
         tenant_id=ctx.tenant_id,
         module_code=code,
         submodule=payload.submodule,
         title=payload.title,
-        payload=payload.payload,
+        payload=validated_payload,
         patient_id=payload.patient_id,
         provider_id=payload.provider_id,
         actor_id=ctx.user.id,
@@ -113,8 +117,13 @@ def patch_domain_record(
 ):
     code = _check_module(module_code)
     row = dom.get_record(db, ctx.tenant_id, code, record_id)
+    validated_payload = payload.payload
+    if payload.payload is not None:
+        validated_payload = validate_domain_payload(
+            code, row.submodule, {**(row.payload or {}), **payload.payload}, patient_id=row.patient_id,
+        )
     dom.update_record(
-        db, row, title=payload.title, payload=payload.payload,
+        db, row, title=payload.title, payload=validated_payload,
         actor_id=ctx.user.id, correlation_id=ctx.correlation_id,
     )
     db.commit()

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
+import ClinicalProfileFields, { createClinicalProfile } from "../../components/ClinicalProfileFields";
 
 type Triage = {
   id: string;
@@ -27,6 +28,7 @@ export default function EmergencyPage() {
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ patient_id: "", chief_complaint: "", esi_level: "3", notes: "" });
   const [disposition, setDisposition] = useState("discharge");
+  const [clinicalProfile, setClinicalProfile] = useState(() => createClinicalProfile("emergency"));
 
   const patientMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -50,6 +52,7 @@ export default function EmergencyPage() {
   async function register(e: FormEvent) {
     e.preventDefault();
     await api("/emergency/triage", {
+        clinical_profile: clinicalProfile,
       method: "POST",
       body: JSON.stringify({
         patient_id: form.patient_id,
@@ -97,6 +100,7 @@ export default function EmergencyPage() {
             <label>ESI level</label>
             <select value={form.esi_level} onChange={(e) => setForm({ ...form, esi_level: e.target.value })}>
               {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+        <ClinicalProfileFields type="emergency" values={clinicalProfile} onChange={setClinicalProfile} />
             </select>
           </div>
         </div>

@@ -120,7 +120,7 @@ export default function AppLayout() {
       <main className="main">
         <div className="topbar">
           <div className="topbar__left">
-            <span className="topbar__title">{roleLabel} workspace</span>
+            <span className="topbar__title">Hospital operations <small>{roleLabel} workspace</small></span>
           </div>
           <div className="topbar__user">
             <div className="user-chip">

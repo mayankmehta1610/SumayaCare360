@@ -49,6 +49,7 @@ def serialize_ot(row: m.OtProcedure) -> dict:
         "pre_op_checklist": row.pre_op_checklist or {},
         "intra_op_notes": row.intra_op_notes,
         "implant_tracking": row.implant_tracking or [],
+        "procedure_profile": row.procedure_profile or {},
     }
 
 
@@ -84,6 +85,7 @@ def create_ot_procedure(
     surgeon_id: Optional[UUID] = None,
     scheduled_at: Optional[datetime] = None,
     actor_id: UUID,
+    procedure_profile: Optional[dict] = None,
     correlation_id: Optional[str] = None,
 ) -> m.OtProcedure:
     patient = db.query(m.Patient).filter(
@@ -102,6 +104,7 @@ def create_ot_procedure(
         scheduled_at=scheduled_at,
         status="scheduled",
         pre_op_checklist={"consent": False, "labs_ok": False, "npo": False},
+        procedure_profile=procedure_profile or {},
     )
     db.add(row)
     db.flush()

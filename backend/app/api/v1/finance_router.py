@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.deps import AuthContext, require_permission
+from app.data.clinical_profiles import validate_clinical_profile
 from app.db.session import get_db
 from app.models import entities as m
 from app.services import finance_domains as fin
@@ -20,6 +21,7 @@ class ClaimCreate(BaseModel):
     amount: float
     policy_no: str = ""
     notes: str = ""
+    claim_profile: dict[str, object]
 
 
 class ClaimStatusUpdate(BaseModel):
@@ -64,10 +66,12 @@ def create_claim(
     ctx: AuthContext = Depends(require_permission("billing:*")),
     db: Session = Depends(get_db),
 ):
+    profile = validate_clinical_profile("insurance_claim", payload.claim_profile)
     row = fin.create_claim(
         db, tenant_id=ctx.tenant_id, patient_id=payload.patient_id,
         payer_code=payload.payer_code, amount=payload.amount,
         policy_no=payload.policy_no, notes=payload.notes,
+        claim_profile=profile,
         actor_id=ctx.user.id, correlation_id=ctx.correlation_id,
     )
     db.commit()

@@ -13,6 +13,7 @@ from app.services import modules as mod_svc
 from app.services.pagination import paginate, page_response
 from app.services.care_journey import discharge_ipd
 from app.data.module_catalog import MODULE_CATALOG
+from app.data.clinical_profiles import validate_clinical_profile
 from app.data.slug_aliases import normalize_slug, SLUG_ALIASES
 
 router = APIRouter(tags=["modules"])
@@ -40,6 +41,15 @@ class ModuleRecordUpdate(BaseModel):
     title: Optional[str] = None
     status: Optional[str] = None
     payload: Optional[dict[str, Any]] = None
+
+
+class IpdAdmissionCreate(BaseModel):
+    patient_id: UUID
+    bed_code: str
+    ward_code: str
+    diagnosis_code: str
+    admission_profile: dict[str, Any]
+
 
 
 def _serialize_record(r: m.ModuleRecord) -> dict:
@@ -92,20 +102,14 @@ def list_platform_modules(ctx: AuthContext = Depends(get_current_context), db: S
 
 @router.get("/platform/workflows")
 def list_workflows(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
-    rows = db.query(m.WorkflowDefinition).filter(
-        or_(m.WorkflowDefinition.tenant_id == ctx.tenant_id, m.WorkflowDefinition.tenant_id.is_(None)),
-        m.WorkflowDefinition.is_deleted == False,
-    ).all()
-    return [{"code": r.workflow_code, "name": r.name, "module_code": r.module_code, "steps": r.steps} for r in rows]
+    from app.data.hospital_workflows import HOSPITAL_WORKFLOWS
+    return HOSPITAL_WORKFLOWS
 
 
 @router.get("/platform/reports")
 def list_reports(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
-    rows = db.query(m.ReportDefinition).filter(
-        or_(m.ReportDefinition.tenant_id == ctx.tenant_id, m.ReportDefinition.tenant_id.is_(None)),
-        m.ReportDefinition.is_deleted == False,
-    ).all()
-    return [{"code": r.code, "name": r.name, "audience": r.audience, "module_code": r.module_code} for r in rows]
+    from app.services.reports import list_report_catalog
+    return list_report_catalog()
 
 
 @router.get("/platform/module-flow")
@@ -326,25 +330,26 @@ def api_backlog_create(module_code: str, payload: ModuleRecordCreate, ctx: AuthC
 @router.get("/clinical/ipd-admissions")
 def list_ipd(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     rows = db.query(m.IpdAdmission).filter(m.IpdAdmission.tenant_id == ctx.tenant_id).all()
-    return [{"id": str(r.id), "admission_no": r.admission_no, "bed_code": r.bed_code, "status": r.status, "patient_id": str(r.patient_id)} for r in rows]
+    return [{"id": str(r.id), "admission_no": r.admission_no, "bed_code": r.bed_code,
+             "ward_code": r.ward_code, "diagnosis_code": r.diagnosis_code, "status": r.status,
+             "patient_id": str(r.patient_id), "admission_profile": r.admission_profile or {}} for r in rows]
 
 
 @router.post("/clinical/ipd-admissions")
 def admit_ipd(
-    patient_id: UUID,
-    bed_code: str,
-    ward_code: str = "GEN",
-    diagnosis_code: Optional[str] = None,
+    payload: IpdAdmissionCreate,
     ctx: AuthContext = Depends(resolve_tenant_context),
     db: Session = Depends(get_db),
 ):
-    bed = db.query(m.Bed).filter(m.Bed.tenant_id == ctx.tenant_id, m.Bed.bed_code == bed_code, m.Bed.status == "available").first()
+    profile = validate_clinical_profile("ipd", payload.admission_profile)
+    bed = db.query(m.Bed).filter(m.Bed.tenant_id == ctx.tenant_id, m.Bed.bed_code == payload.bed_code, m.Bed.status == "available").first()
     if not bed:
         raise HTTPException(400, "Bed not available — check bed master")
     n = db.query(m.IpdAdmission).filter(m.IpdAdmission.tenant_id == ctx.tenant_id).count() + 1
     row = m.IpdAdmission(
-        tenant_id=ctx.tenant_id, patient_id=patient_id, admission_no=f"IPD-{n:06d}",
-        bed_code=bed_code, ward_code=ward_code, diagnosis_code=diagnosis_code,
+        tenant_id=ctx.tenant_id, patient_id=payload.patient_id, admission_no=f"IPD-{n:06d}",
+        bed_code=payload.bed_code, ward_code=payload.ward_code, diagnosis_code=payload.diagnosis_code,
+        admission_profile=profile,
         created_by=ctx.user.id, updated_by=ctx.user.id,
     )
     bed.status = "occupied"

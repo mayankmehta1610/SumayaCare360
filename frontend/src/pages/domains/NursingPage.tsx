@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { apiList, fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
+import ClinicalProfileFields, { createClinicalProfile } from "../../components/ClinicalProfileFields";
 
 type Task = {
   id: string;
@@ -23,6 +24,7 @@ export default function NursingPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ patient_id: "", admission_id: "", task_type: "vitals_check", description: "" });
+  const [careProfile, setCareProfile] = useState(() => createClinicalProfile("nursing"));
 
   const patientMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -54,6 +56,7 @@ export default function NursingPage() {
         admission_id: form.admission_id || undefined,
         task_type: form.task_type,
         description: form.description,
+        care_profile: careProfile,
       }),
     });
     setMsg("Nursing task created");
@@ -111,6 +114,7 @@ export default function NursingPage() {
           <label>Description</label>
           <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </div>
+        <ClinicalProfileFields type="nursing" values={careProfile} onChange={setCareProfile} />
         <button type="submit">Create task</button>
       </form>
 

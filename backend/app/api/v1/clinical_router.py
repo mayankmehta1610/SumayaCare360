@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.deps import AuthContext, require_tenant
+from app.data.clinical_profiles import validate_clinical_profile
 from app.db.session import get_db
 from app.models import entities as m
 from app.services import clinical_domains as clinical
@@ -24,6 +25,7 @@ class LabOrderCreate(BaseModel):
     test_code: str
     encounter_id: Optional[UUID] = None
     provider_id: Optional[UUID] = None
+    order_profile: dict[str, Any]
 
 
 class LabResultsPayload(BaseModel):
@@ -39,6 +41,7 @@ class RadiologyOrderCreate(BaseModel):
     encounter_id: Optional[UUID] = None
     provider_id: Optional[UUID] = None
     scheduled_at: Optional[datetime] = None
+    order_profile: dict[str, Any]
 
 
 class RadiologyOrderUpdate(BaseModel):
@@ -63,6 +66,7 @@ class PharmacyDispenseCreate(BaseModel):
     prescription_line_id: Optional[UUID] = None
     encounter_id: Optional[UUID] = None
     substitution_code: Optional[str] = None
+    dispense_profile: dict[str, Any]
 
 
 class PrescriptionDispenseCreate(BaseModel):
@@ -76,6 +80,7 @@ class NursingTaskCreate(BaseModel):
     description: Optional[str] = None
     due_at: Optional[datetime] = None
     assigned_to: Optional[UUID] = None
+    care_profile: dict[str, Any]
 
 
 class NursingTaskUpdate(BaseModel):
@@ -109,6 +114,7 @@ def create_lab_order(
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
+    profile = validate_clinical_profile("laboratory", payload.order_profile)
     row = clinical.create_lab_order(
         db,
         tenant_id=ctx.tenant_id,
@@ -116,12 +122,26 @@ def create_lab_order(
         test_code=payload.test_code,
         encounter_id=payload.encounter_id,
         provider_id=payload.provider_id,
+        order_profile=profile,
         actor_id=ctx.user.id,
         correlation_id=ctx.correlation_id,
     )
     db.commit()
     db.refresh(row)
     return clinical.serialize_lab_order(row)
+
+
+@router.get("/lab-orders/workflow")
+def lab_workflow(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
+    """Return the lab state machine before the UUID catch-all route matches."""
+    from app.data.clinical_workflow import LAB_WORKFLOW
+    from sqlalchemy import distinct
+    db_statuses = [
+        r[0] for r in db.query(distinct(m.LabOrder.status))
+        .filter(m.LabOrder.tenant_id == ctx.tenant_id).all() if r[0]
+    ]
+    statuses = list(dict.fromkeys(LAB_WORKFLOW["statuses"] + db_statuses))
+    return {"statuses": statuses, "next": LAB_WORKFLOW["next"]}
 
 
 @router.get("/lab-orders/{order_id}")
@@ -194,6 +214,7 @@ def create_radiology_order(
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
+    profile = validate_clinical_profile("radiology", payload.order_profile)
     row = clinical.create_radiology_order(
         db,
         tenant_id=ctx.tenant_id,
@@ -202,6 +223,7 @@ def create_radiology_order(
         encounter_id=payload.encounter_id,
         provider_id=payload.provider_id,
         scheduled_at=payload.scheduled_at,
+        order_profile=profile,
         actor_id=ctx.user.id,
         correlation_id=ctx.correlation_id,
     )
@@ -339,6 +361,7 @@ def create_pharmacy_dispense(
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
+    profile = validate_clinical_profile("pharmacy", payload.dispense_profile)
     row = clinical.create_pharmacy_dispense(
         db,
         tenant_id=ctx.tenant_id,
@@ -349,6 +372,7 @@ def create_pharmacy_dispense(
         prescription_line_id=payload.prescription_line_id,
         encounter_id=payload.encounter_id,
         substitution_code=payload.substitution_code,
+        dispense_profile=profile,
         actor_id=ctx.user.id,
         correlation_id=ctx.correlation_id,
     )
@@ -428,6 +452,7 @@ def create_nursing_task(
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
+    profile = validate_clinical_profile("nursing", payload.care_profile)
     row = clinical.create_nursing_task(
         db,
         tenant_id=ctx.tenant_id,
@@ -437,6 +462,7 @@ def create_nursing_task(
         description=payload.description,
         due_at=payload.due_at,
         assigned_to=payload.assigned_to,
+        care_profile=profile,
         actor_id=ctx.user.id,
         correlation_id=ctx.correlation_id,
     )
@@ -538,18 +564,6 @@ def export_radiology_orders(
         from app.services.export_util import records_to_csv
         return {"format": "csv", "count": len(records), "csv": records_to_csv(records)}
     return {"format": "json", "count": len(records), "records": records}
-
-
-@router.get("/lab-orders/workflow")
-def lab_workflow(ctx: AuthContext = Depends(require_tenant), db: Session = Depends(get_db)):
-    from app.data.clinical_workflow import LAB_WORKFLOW
-    from sqlalchemy import distinct
-    db_statuses = [
-        r[0] for r in db.query(distinct(m.LabOrder.status))
-        .filter(m.LabOrder.tenant_id == ctx.tenant_id).all() if r[0]
-    ]
-    statuses = list(dict.fromkeys(LAB_WORKFLOW["statuses"] + db_statuses))
-    return {"statuses": statuses, "next": LAB_WORKFLOW["next"]}
 
 
 @router.get("/radiology/workflow")
