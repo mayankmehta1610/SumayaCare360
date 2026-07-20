@@ -539,6 +539,7 @@ def create_patient(payload: PatientCreate, request: Request, ctx: AuthContext = 
         phone=payload.phone, email=str(payload.email) if payload.email else None,
         address=payload.address, blood_group=payload.blood_group,
         national_id=payload.national_id, emergency_contact=payload.emergency_contact,
+        registration_profile=payload.registration_profile,
         created_by=ctx.user.id, updated_by=ctx.user.id,
     )
     db.add(row)
@@ -663,6 +664,7 @@ def create_appointment(payload: AppointmentCreate, ctx: AuthContext = Depends(re
         tenant_id=ctx.tenant_id, branch_id=payload.branch_id,
         patient_id=payload.patient_id, provider_id=payload.provider_id,
         scheduled_at=payload.scheduled_at, mode=payload.mode, reason=payload.reason,
+        booking_profile=payload.booking_profile,
         queue_token=f"T{token_n:04d}", status="scheduled",
         created_by=ctx.user.id, updated_by=ctx.user.id,
     )

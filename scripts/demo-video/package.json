@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "generate": "node generate.mjs",
+    "generate:comprehensive": "node generate-comprehensive.mjs",
     "install-browser": "npx playwright install chromium"
   },
   "dependencies": {

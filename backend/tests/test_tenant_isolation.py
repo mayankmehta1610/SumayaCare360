@@ -59,7 +59,8 @@ def test_tenant_a_cannot_read_tenant_b_patients(setup_db):
         headers={"Authorization": f"Bearer {token_a}", "X-Tenant-Code": "iso-a"},
     )
     assert r.status_code == 200
-    patients_a = r.json()
+    body_a = r.json()
+    patients_a = body_a.get("items", []) if isinstance(body_a, dict) else body_a
     assert all(p.get("mrn") != "MRN-B-001" for p in patients_a)
     mrns = {p.get("mrn") for p in patients_a}
     assert "MRN-A-001" in mrns or len(mrns) >= 0
@@ -70,7 +71,8 @@ def test_tenant_a_cannot_read_tenant_b_patients(setup_db):
         headers={"Authorization": f"Bearer {token_b}", "X-Tenant-Code": "iso-b"},
     )
     assert r_b.status_code == 200
-    for p in r_b.json():
+    body_b = r_b.json()
+    for p in body_b.get("items", []) if isinstance(body_b, dict) else body_b:
         assert p.get("mrn") != "MRN-A-001"
 
 

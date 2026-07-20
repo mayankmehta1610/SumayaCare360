@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
+import ClinicalProfileFields, { createClinicalProfile } from "../../components/ClinicalProfileFields";
 
 type Admission = {
   id: string;
@@ -19,6 +20,7 @@ export default function InpatientPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ patient_id: "", bed_code: "", ward_code: "GEN", diagnosis_code: "" });
+  const [admissionProfile, setAdmissionProfile] = useState(() => createClinicalProfile("ipd"));
 
   const patientMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -43,16 +45,14 @@ export default function InpatientPage() {
 
   async function admit(e: FormEvent) {
     e.preventDefault();
-    const q = new URLSearchParams({
-      patient_id: form.patient_id,
-      bed_code: form.bed_code,
-      ward_code: form.ward_code,
+    await api("/clinical/ipd-admissions", {
+      method: "POST",
+      body: JSON.stringify({ ...form, admission_profile: admissionProfile }),
     });
-    if (form.diagnosis_code) q.set("diagnosis_code", form.diagnosis_code);
-    await api(`/clinical/ipd-admissions?${q}`, { method: "POST" });
     setMsg("Patient admitted");
     setForm({ patient_id: "", bed_code: "", ward_code: "GEN", diagnosis_code: "" });
     await load();
+    setAdmissionProfile(createClinicalProfile("ipd"));
   }
 
   async function discharge(id: string) {
@@ -106,6 +106,7 @@ export default function InpatientPage() {
             <input value={form.diagnosis_code} onChange={(e) => setForm({ ...form, diagnosis_code: e.target.value })} placeholder="Optional ICD / disease code" />
           </div>
           <button type="submit">Admit patient</button>
+        <ClinicalProfileFields type="ipd" values={admissionProfile} onChange={setAdmissionProfile} />
         </form>
 
         <div className="card">

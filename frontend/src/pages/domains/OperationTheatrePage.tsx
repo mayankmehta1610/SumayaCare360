@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
+import ClinicalProfileFields, { createClinicalProfile } from "../../components/ClinicalProfileFields";
 
 type OtProc = {
   id: string;
@@ -27,6 +28,7 @@ export default function OperationTheatrePage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ patient_id: "", procedure_code: "", procedure_name: "", theatre_code: "OT-1" });
+  const [procedureProfile, setProcedureProfile] = useState(() => createClinicalProfile("operation_theatre"));
 
   const patientMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -51,7 +53,7 @@ export default function OperationTheatrePage() {
     e.preventDefault();
     await api("/ot/procedures", {
       method: "POST",
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, procedure_profile: procedureProfile }),
     });
     setMsg("OT procedure scheduled");
     await load();
@@ -112,6 +114,7 @@ export default function OperationTheatrePage() {
           </div>
         </div>
         <button type="submit">Schedule</button>
+        <ClinicalProfileFields type="operation_theatre" values={procedureProfile} onChange={setProcedureProfile} />
       </form>
 
       <div className="card table-wrap" style={{ marginTop: "1rem" }}>

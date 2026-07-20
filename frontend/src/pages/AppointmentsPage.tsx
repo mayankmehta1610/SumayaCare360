@@ -18,6 +18,14 @@ export default function AppointmentsPage() {
     scheduled_at: "",
     mode: "in_person",
     reason: "",
+    visit_type: "new_consultation",
+    department_code: "general_medicine",
+    priority: "routine",
+    duration_minutes: "30",
+    referral_source: "self",
+    payer_type: "self_pay",
+    callback_phone: "",
+    booking_notes: "",
   });
 
   async function load() {
@@ -43,11 +51,13 @@ export default function AppointmentsPage() {
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     try {
+      const { visit_type, department_code, priority, duration_minutes, referral_source, payer_type, callback_phone, booking_notes, ...appointment } = form;
       await api("/appointments", {
         method: "POST",
         body: JSON.stringify({
-          ...form,
+          ...appointment,
           scheduled_at: new Date(form.scheduled_at).toISOString(),
+          booking_profile: { visit_type, department_code, priority, duration_minutes: Number(duration_minutes), referral_source, payer_type, callback_phone, notes: booking_notes },
         }),
       });
       setMsg("Appointment booked");
@@ -131,10 +141,26 @@ export default function AppointmentsPage() {
             </select>
           </div>
           <div className="field">
-            <label>Reason</label>
-            <input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+            <label>Reason for visit *</label>
+            <input required minLength={2} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
           </div>
-          <button type="submit">Book</button>
+          <div className="grid-2">
+            <div className="field"><label>Visit type *</label><select required value={form.visit_type} onChange={(e) => setForm({ ...form, visit_type: e.target.value })}><option value="new_consultation">New consultation</option><option value="follow_up">Follow-up</option><option value="procedure">Procedure</option><option value="diagnostic">Diagnostic</option><option value="preventive">Preventive care</option></select></div>
+            <div className="field"><label>Department *</label><select required value={form.department_code} onChange={(e) => setForm({ ...form, department_code: e.target.value })}><option value="general_medicine">General medicine</option><option value="paediatrics">Paediatrics</option><option value="obstetrics_gynaecology">Obstetrics and gynaecology</option><option value="orthopaedics">Orthopaedics</option><option value="cardiology">Cardiology</option><option value="surgery">Surgery</option><option value="diagnostics">Diagnostics</option></select></div>
+            <div className="field"><label>Priority *</label><select required value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option value="routine">Routine</option><option value="urgent">Urgent</option><option value="priority">Priority / vulnerable patient</option></select></div>
+            <div className="field"><label>Planned duration (minutes) *</label><input required type="number" min="5" max="480" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} /></div>
+            <div className="field"><label>Referral source *</label><select required value={form.referral_source} onChange={(e) => setForm({ ...form, referral_source: e.target.value })}><option value="self">Self / walk-in</option><option value="internal">Internal referral</option><option value="external_provider">External provider</option><option value="camp">Health camp</option><option value="online">Online</option></select></div>
+            <div className="field"><label>Payer type *</label><select required value={form.payer_type} onChange={(e) => setForm({ ...form, payer_type: e.target.value })}><option value="self_pay">Self pay</option><option value="insurance">Insurance</option><option value="corporate">Corporate</option><option value="government">Government scheme</option></select></div>
+          </div>
+          <div className="field">
+            <label>Callback phone *</label>
+            <input required type="tel" minLength={8} value={form.callback_phone} onChange={(e) => setForm({ ...form, callback_phone: e.target.value })} />
+          </div>
+          <div className="field">
+            <label>Booking instructions</label>
+            <textarea rows={2} value={form.booking_notes} onChange={(e) => setForm({ ...form, booking_notes: e.target.value })} />
+          </div>
+          <button type="submit">Book appointment</button>
         </form>
         <div className="card table-wrap">
           <table>

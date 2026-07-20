@@ -4,10 +4,11 @@ import AppLayout from "./components/AppLayout";
 import LoginPage from "./pages/LoginPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import DashboardPage from "./pages/DashboardPage";
-import PatientsPage from "./pages/PatientsPage";
+import PatientsPage from "./pages/PatientsPageV2";
 import ProvidersPage from "./pages/ProvidersPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import CareJourneyPage from "./pages/CareJourneyPage";
+import PatientAdministrationPage from "./pages/PatientAdministrationPage";
 import EncountersPage from "./pages/EncountersPage";
 import TelemedicinePage from "./pages/TelemedicinePage";
 import BillingPage from "./pages/BillingPage";
@@ -92,6 +93,7 @@ const childRoutes = (
     <Route path="providers" element={<ProvidersPage />} />
     <Route path="appointments" element={<AppointmentsPage />} />
     <Route path="care-journey" element={<CareJourneyPage />} />
+    <Route path="patient-administration" element={<PatientAdministrationPage />} />
     <Route path="encounters" element={<EncountersPage />} />
     <Route path="telemedicine" element={<TelemedicinePage />} />
     <Route path="billing" element={<BillingPage />} />

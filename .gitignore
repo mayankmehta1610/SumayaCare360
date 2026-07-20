@@ -19,3 +19,6 @@ miniodata/
 *.db
 requirements_dump.md
 _extract/
+scripts/demo-video/output/
+scripts/demo-video/output-comprehensive/
+scripts/demo-video/output-roles/

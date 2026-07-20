@@ -44,6 +44,7 @@ def serialize_triage(row: m.TriageAssessment) -> dict:
         "status": row.status,
         "disposition": row.disposition,
         "notes": row.notes,
+        "clinical_profile": row.clinical_profile or {},
         "arrived_at": row.arrived_at,
         "triaged_at": row.triaged_at,
         "disposition_at": row.disposition_at,
@@ -79,6 +80,7 @@ def create_triage(
     chief_complaint: str,
     esi_level: int,
     notes: str = "",
+    clinical_profile: dict,
     actor_id: UUID,
     correlation_id: Optional[str] = None,
 ) -> m.TriageAssessment:
@@ -96,6 +98,7 @@ def create_triage(
         chief_complaint=chief_complaint,
         esi_level=esi_level,
         notes=notes,
+        clinical_profile=clinical_profile,
         status="arrived",
     )
     db.add(row)

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.deps import AuthContext, require_tenant
+from app.data.clinical_profiles import validate_clinical_profile
 from app.db.session import get_db
 from app.services import ot_domains as ot
 
@@ -21,6 +22,7 @@ class OtCreate(BaseModel):
     theatre_code: str = ""
     surgeon_id: Optional[UUID] = None
     scheduled_at: Optional[datetime] = None
+    procedure_profile: dict[str, Any]
 
 
 class PreOpUpdate(BaseModel):
@@ -43,6 +45,7 @@ def create_procedure(
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
+    profile = validate_clinical_profile("operation_theatre", payload.procedure_profile)
     row = ot.create_ot_procedure(
         db,
         tenant_id=ctx.tenant_id,
@@ -52,6 +55,7 @@ def create_procedure(
         theatre_code=payload.theatre_code,
         surgeon_id=payload.surgeon_id,
         scheduled_at=payload.scheduled_at,
+        procedure_profile=profile,
         actor_id=ctx.user.id,
         correlation_id=ctx.correlation_id,
     )

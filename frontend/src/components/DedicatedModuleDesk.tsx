@@ -7,6 +7,7 @@ import ModuleFeaturePanel from "./ModuleFeaturePanel";
 import { useAuth } from "../context/AuthContext";
 import { canDelete, canWriteWorkspace } from "../hooks/usePermissions";
 import { exportFromApi } from "../utils/export";
+import OperationalFields, { OperationalField } from "./OperationalFields";
 
 export type DomainMeta = {
   module_code: string;
@@ -15,6 +16,8 @@ export type DomainMeta = {
   api_prefix: string;
   initial_status: string;
   statuses: string[];
+  fields_by_submodule: Record<string, OperationalField[]>;
+  requires_patient: boolean;
 };
 
 type RecordRow = {
@@ -55,6 +58,13 @@ export default function DedicatedModuleDesk({ moduleCode, description, linkPatie
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ title: "", patient_id: "", extras: {} as Record<string, string> });
 
+  const patientLinked = Boolean(linkPatient || meta?.requires_patient);
+  const activeFields = useMemo<OperationalField[]>(() => {
+    const configured = meta?.fields_by_submodule?.[activeTab] || [];
+    if (configured.length) return configured;
+    return extraFields.map((field) => ({ ...field, type: "text" }));
+  }, [meta, activeTab, extraFields]);
+
   const patientMap = useMemo(() => {
     const m = new Map<string, string>();
     patients.forEach((p) => m.set(p.id, `${p.first_name} ${p.last_name}`));
@@ -84,7 +94,7 @@ export default function DedicatedModuleDesk({ moduleCode, description, linkPatie
     setMeta(m);
     const tab = activeTab || m.submodules[0] || "";
     if (!activeTab && tab) setActiveTab(tab);
-    if (linkPatient) setPatients(await fetchPatients());
+    if (linkPatient || m.requires_patient) setPatients(await fetchPatients());
   }
 
   useEffect(() => {
@@ -163,7 +173,7 @@ export default function DedicatedModuleDesk({ moduleCode, description, linkPatie
       { key: "reference_no", label: "Ref" },
       { key: "title", label: "Title" },
     ];
-    if (linkPatient) {
+    if (patientLinked) {
       cols.push({
         key: "patient",
         label: "Patient",
@@ -176,7 +186,7 @@ export default function DedicatedModuleDesk({ moduleCode, description, linkPatie
       render: (r) => <span className="badge">{r.status}</span>,
     });
     return cols;
-  }, [linkPatient, patientMap]);
+  }, [patientLinked, patientMap]);
 
   if (!meta) return <div className="muted">Loading {moduleCode}…</div>;
 
@@ -201,28 +211,19 @@ export default function DedicatedModuleDesk({ moduleCode, description, linkPatie
         <form className="card" style={{ marginBottom: "1rem" }} onSubmit={(e) => onCreate(e).catch((err) => setError(err.message))}>
           <h3 style={{ marginTop: 0 }}>{editId ? "Edit" : "New"} — {activeTab}</h3>
           <div className="field">
-            <label>Title</label>
+            <label>Record summary *</label>
             <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           </div>
-          {linkPatient && (
+          {patientLinked && (
             <div className="field">
-              <label>Patient</label>
-              <select value={form.patient_id} onChange={(e) => setForm({ ...form, patient_id: e.target.value })}>
-                <option value="">Optional</option>
+              <label>Patient{meta.requires_patient ? " *" : ""}</label>
+              <select required={meta.requires_patient} value={form.patient_id} onChange={(e) => setForm({ ...form, patient_id: e.target.value })}>
+                <option value="">Select patient</option>
                 {patients.map((p) => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
               </select>
             </div>
           )}
-          {extraFields.map((f) => (
-            <div className="field" key={f.key}>
-              <label>{f.label}</label>
-              <input
-                value={form.extras[f.key] || ""}
-                placeholder={f.placeholder}
-                onChange={(e) => setForm({ ...form, extras: { ...form.extras, [f.key]: e.target.value } })}
-              />
-            </div>
-          ))}
+          <OperationalFields fields={activeFields} values={form.extras} onChange={(extras) => setForm({ ...form, extras: extras as Record<string, string> })} />
           <button type="submit">{editId ? "Save changes" : "Create"}</button>
           {editId && (
             <button type="button" className="secondary" style={{ marginLeft: "0.5rem" }} onClick={() => { setEditId(""); setForm({ title: "", patient_id: "", extras: {} }); }}>

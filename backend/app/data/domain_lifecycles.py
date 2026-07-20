@@ -146,6 +146,7 @@ def get_domain_meta(module_code: str) -> dict | None:
     statuses = set(cfg["transitions"].keys())
     for targets in cfg["transitions"].values():
         statuses |= targets
+    from app.data.domain_fields import DOMAIN_FIELD_SCHEMAS, PATIENT_LINKED_MODULES
     return {
         "module_code": module_code,
         "name": cat["name"],
@@ -155,6 +156,8 @@ def get_domain_meta(module_code: str) -> dict | None:
         "initial_status": cfg["initial_status"],
         "statuses": sorted(statuses),
         "transitions": {k: sorted(v) for k, v in cfg["transitions"].items()},
+        "fields_by_submodule": DOMAIN_FIELD_SCHEMAS.get(module_code, {}),
+        "requires_patient": module_code in PATIENT_LINKED_MODULES,
     }
 
 

@@ -14,6 +14,7 @@ from app.api.v1.emergency_router import router as emergency_router
 from app.api.v1.ot_router import router as ot_router
 from app.api.v1.dedicated_router import router as dedicated_router
 from app.api.v1.features_router import router as features_router
+from app.api.v1.patient_admin_router import router as patient_admin_router
 from app.middleware.api_audit import ApiAuditMiddleware
 from app.db.session import Base, engine
 from app.models import entities as m
@@ -49,6 +50,7 @@ app.include_router(emergency_router, prefix="/api/v1")
 app.include_router(ot_router, prefix="/api/v1")
 app.include_router(dedicated_router, prefix="/api/v1")
 app.include_router(features_router, prefix="/api/v1")
+app.include_router(patient_admin_router, prefix="/api/v1")
 
 
 @app.on_event("startup")

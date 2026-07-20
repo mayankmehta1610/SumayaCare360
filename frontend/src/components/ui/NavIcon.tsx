@@ -32,6 +32,7 @@ import {
   TrendingUp,
   Truck,
   Users,
+  UserRoundCog,
   Video,
 } from "lucide-react";
 
@@ -40,6 +41,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/demo-tour": PlayCircle,
   "/module-map": Map,
   "/care-journey": Route,
+  "/patient-administration": UserRoundCog,
   "/tenants": Building2,
   "/patients": Users,
   "/providers": Stethoscope,
@@ -120,7 +122,7 @@ export default function NavIcon({ route, code, size = 18, className }: Props) {
     const key = normalizeRoute(route);
     Icon = ROUTE_ICONS[key] || ROUTE_ICONS[`/${key.split("/").filter(Boolean).pop()}`] || Sparkles;
   }
-  return <Icon size={size} strokeWidth={2} className={className} aria-hidden />;
+  return <Icon size={size} strokeWidth={1.8} className={className} aria-hidden />;
 }
 
 export { KPI_ICONS };

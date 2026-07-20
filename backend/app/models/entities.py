@@ -227,6 +227,7 @@ class Patient(Base, AuditedMixin):
     blood_group = Column(String(8))
     national_id = Column(String(64))
     emergency_contact = Column(JSON, default=dict)
+    registration_profile = Column(JSON, default=dict)
     status = Column(String(32), default="active")
     __table_args__ = (
         UniqueConstraint("tenant_id", "mrn", name="uq_patient_tenant_mrn"),
@@ -270,6 +271,7 @@ class Appointment(Base, AuditedMixin):
     reason = Column(Text)
     queue_token = Column(String(32))
     notes = Column(Text)
+    booking_profile = Column(JSON, default=dict)
 
 
 class Encounter(Base, AuditedMixin):
@@ -538,6 +540,7 @@ class InsuranceClaim(Base, AuditedMixin):
     pre_auth_no = Column(String(128))
     policy_no = Column(String(128))
     notes = Column(Text)
+    claim_profile = Column(JSON, default=dict)
 
 
 class LabOrder(Base, AuditedMixin):
@@ -553,6 +556,7 @@ class LabOrder(Base, AuditedMixin):
     result_notes = Column(Text)
     results = Column(JSON, default=dict)
     critical_flag = Column(Boolean, default=False)
+    order_profile = Column(JSON, default=dict)
 
 
 class RadiologyOrder(Base, AuditedMixin):
@@ -568,6 +572,7 @@ class RadiologyOrder(Base, AuditedMixin):
     pacs_link = Column(String(512))
     critical_flag = Column(Boolean, default=False)
     scheduled_at = Column(DateTime(timezone=True), nullable=True)
+    order_profile = Column(JSON, default=dict)
 
 
 class PharmacyDispense(Base, AuditedMixin):
@@ -582,6 +587,7 @@ class PharmacyDispense(Base, AuditedMixin):
     qty = Column(Numeric(10, 2), default=1)
     status = Column(String(32), default="queued")
     substitution_code = Column(String(64))
+    dispense_profile = Column(JSON, default=dict)
 
 
 class NursingTask(Base, AuditedMixin):
@@ -595,6 +601,7 @@ class NursingTask(Base, AuditedMixin):
     due_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     assigned_to = Column(GUID(), ForeignKey("users.id"), nullable=True)
+    care_profile = Column(JSON, default=dict)
     __table_args__ = (
         Index("ix_nursing_task_search", "tenant_id", "admission_id", "status", "due_at"),
     )
@@ -611,6 +618,7 @@ class IpdAdmission(Base, AuditedMixin):
     admitted_at = Column(DateTime(timezone=True), default=utcnow)
     discharged_at = Column(DateTime(timezone=True), nullable=True)
     diagnosis_code = Column(String(64))
+    admission_profile = Column(JSON, default=dict)
 
 
 class WorkflowDefinition(Base, AuditedMixin):
@@ -730,6 +738,7 @@ class TriageAssessment(Base, AuditedMixin):
     arrived_at = Column(DateTime(timezone=True), default=utcnow)
     triaged_at = Column(DateTime(timezone=True), nullable=True)
     disposition_at = Column(DateTime(timezone=True), nullable=True)
+    clinical_profile = Column(JSON, default=dict)
     __table_args__ = (
         Index("ix_triage_search", "tenant_id", "status", "esi_level", "arrived_at"),
     )
@@ -749,6 +758,7 @@ class OtProcedure(Base, AuditedMixin):
     pre_op_checklist = Column(JSON, default=dict)
     intra_op_notes = Column(Text)
     implant_tracking = Column(JSON, default=list)
+    procedure_profile = Column(JSON, default=dict)
     __table_args__ = (
         Index("ix_ot_search", "tenant_id", "status", "scheduled_at"),
     )

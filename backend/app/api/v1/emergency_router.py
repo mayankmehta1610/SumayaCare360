@@ -1,5 +1,5 @@
 """Emergency & triage APIs."""
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.deps import AuthContext, require_tenant
+from app.data.clinical_profiles import validate_clinical_profile
 from app.db.session import get_db
 from app.services import emergency_domains as er
 
@@ -18,6 +19,7 @@ class TriageCreate(BaseModel):
     chief_complaint: str
     esi_level: int = Field(ge=1, le=5, default=3)
     notes: str = ""
+    clinical_profile: dict[str, Any]
 
 
 class TriageStatusUpdate(BaseModel):
@@ -41,6 +43,7 @@ def create_triage(
     ctx: AuthContext = Depends(require_tenant),
     db: Session = Depends(get_db),
 ):
+    profile = validate_clinical_profile("emergency", payload.clinical_profile)
     row = er.create_triage(
         db,
         tenant_id=ctx.tenant_id,
@@ -49,6 +52,7 @@ def create_triage(
         esi_level=payload.esi_level,
         notes=payload.notes,
         actor_id=ctx.user.id,
+        clinical_profile=profile,
         correlation_id=ctx.correlation_id,
     )
     db.commit()

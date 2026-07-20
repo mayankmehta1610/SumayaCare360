@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { apiList, fetchPatients } from "../../api/list";
 import ModuleFlowBar from "../../components/ModuleFlowBar";
+import ClinicalProfileFields, { createClinicalProfile } from "../../components/ClinicalProfileFields";
 
 type RxQueue = {
   id: string;
@@ -30,6 +31,7 @@ export default function PharmacyPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [form, setForm] = useState({ patient_id: "", medicine_code: "", qty: "1" });
+  const [dispenseProfile, setDispenseProfile] = useState(() => createClinicalProfile("pharmacy"));
 
   const patientMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -71,6 +73,7 @@ export default function PharmacyPage() {
         patient_id: form.patient_id,
         medicine_code: form.medicine_code,
         qty: Number(form.qty),
+        dispense_profile: dispenseProfile,
       }),
     });
     setMsg("Dispense queued — stock checked");
@@ -134,6 +137,7 @@ export default function PharmacyPage() {
               {medicines.map((m) => <option key={m.code} value={m.code}>{m.name} — stock {m.stock_qty ?? "?"}</option>)}
             </select>
           </div>
+        <ClinicalProfileFields type="pharmacy" values={dispenseProfile} onChange={setDispenseProfile} />
           <button type="submit">Queue dispense</button>
         </form>
       </div>
