@@ -9,6 +9,8 @@ type Admission = {
   id: string;
   admission_no: string;
   bed_code: string;
+  ward_code?: string;
+  diagnosis_code?: string;
   status: string;
   patient_id: string;
 };
@@ -16,10 +18,11 @@ type Admission = {
 export default function InpatientPage() {
   const [patients, setPatients] = useState<any[]>([]);
   const [beds, setBeds] = useState<any[]>([]);
+  const [diseases, setDiseases] = useState<any[]>([]);
   const [admissions, setAdmissions] = useState<Admission[]>([]);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
-  const [form, setForm] = useState({ patient_id: "", bed_code: "", ward_code: "GEN", diagnosis_code: "" });
+  const [form, setForm] = useState({ patient_id: "", bed_id: "", diagnosis_id: "" });
   const [admissionProfile, setAdmissionProfile] = useState(() => createClinicalProfile("ipd"));
 
   const patientMap = useMemo(() => {
@@ -29,14 +32,16 @@ export default function InpatientPage() {
   }, [patients]);
 
   async function load() {
-    const [p, b, ip] = await Promise.all([
+    const [p, b, ip, dx] = await Promise.all([
       fetchPatients(),
       api<any[]>("/admin/beds"),
       api<Admission[]>("/clinical/ipd-admissions"),
+      api<any[]>("/masters/diseases"),
     ]);
     setPatients(p);
     setBeds(b.filter((x) => x.status === "available"));
     setAdmissions(ip);
+    setDiseases(dx.filter((x) => x.status === "active"));
   }
 
   useEffect(() => {
@@ -50,7 +55,7 @@ export default function InpatientPage() {
       body: JSON.stringify({ ...form, admission_profile: admissionProfile }),
     });
     setMsg("Patient admitted");
-    setForm({ patient_id: "", bed_code: "", ward_code: "GEN", diagnosis_code: "" });
+    setForm({ patient_id: "", bed_id: "", diagnosis_id: "" });
     await load();
     setAdmissionProfile(createClinicalProfile("ipd"));
   }
@@ -90,20 +95,20 @@ export default function InpatientPage() {
           </div>
           <div className="field">
             <label>Bed (available)</label>
-            <select required value={form.bed_code} onChange={(e) => setForm({ ...form, bed_code: e.target.value })}>
+            <select required value={form.bed_id} onChange={(e) => setForm({ ...form, bed_id: e.target.value })}>
               <option value="">Select</option>
               {beds.map((b) => (
-                <option key={b.id} value={b.bed_code}>{b.bed_code} · {b.room_code}</option>
+                <option key={b.id} value={b.id}>{b.bed_code} · {b.location_label || b.room_code}</option>
               ))}
             </select>
           </div>
           <div className="field">
-            <label>Ward</label>
-            <input value={form.ward_code} onChange={(e) => setForm({ ...form, ward_code: e.target.value })} />
-          </div>
-          <div className="field">
-            <label>Diagnosis code</label>
-            <input value={form.diagnosis_code} onChange={(e) => setForm({ ...form, diagnosis_code: e.target.value })} placeholder="Optional ICD / disease code" />
+            <label>Admission diagnosis (master)</label>
+            <select value={form.diagnosis_id} onChange={(e) => setForm({ ...form, diagnosis_id: e.target.value })}>
+              <option value="">Not established / pending</option>
+              {diseases.map((x) => <option key={x.id} value={x.id}>{x.icd_code || x.code} · {x.name}</option>)}
+            </select>
+            <small className="muted">Ward is derived automatically from the selected bed's room hierarchy.</small>
           </div>
           <button type="submit">Admit patient</button>
         <ClinicalProfileFields type="ipd" values={admissionProfile} onChange={setAdmissionProfile} />
@@ -121,14 +126,15 @@ export default function InpatientPage() {
         <h3 style={{ marginTop: 0 }}>Admissions</h3>
         <table>
           <thead>
-            <tr><th>Admission</th><th>Patient</th><th>Bed</th><th>Status</th><th></th></tr>
+            <tr><th>Admission</th><th>Patient</th><th>Ward / bed</th><th>Diagnosis</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>
             {admissions.map((a) => (
               <tr key={a.id}>
                 <td>{a.admission_no}</td>
                 <td>{patientMap.get(a.patient_id) || a.patient_id.slice(0, 8)}</td>
-                <td>{a.bed_code}</td>
+                <td>{a.ward_code || "—"} / {a.bed_code}</td>
+                <td>{a.diagnosis_code || "Pending"}</td>
                 <td><span className="badge">{a.status}</span></td>
                 <td>
                   {a.status !== "discharged" && (

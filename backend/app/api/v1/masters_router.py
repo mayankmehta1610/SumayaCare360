@@ -115,6 +115,8 @@ def create_master(
 ):
     if not has_permission(ctx.permissions, "masters:*"):
         raise HTTPException(403, "Missing permission: masters:*")
+    if resource == "beds":
+        raise HTTPException(400, "Create beds through the facility hierarchy so every bed is linked to a room")
     row = _build_master_row(resource, payload, ctx)
     row.created_by = ctx.user.id
     row.updated_by = ctx.user.id

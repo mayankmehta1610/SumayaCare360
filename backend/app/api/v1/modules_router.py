@@ -15,6 +15,7 @@ from app.services.care_journey import discharge_ipd
 from app.data.module_catalog import MODULE_CATALOG
 from app.data.clinical_profiles import validate_clinical_profile
 from app.data.slug_aliases import normalize_slug, SLUG_ALIASES
+from app.api.v1.facility_router import serialize_bed, _ancestor, _location
 
 router = APIRouter(tags=["modules"])
 
@@ -45,10 +46,9 @@ class ModuleRecordUpdate(BaseModel):
 
 class IpdAdmissionCreate(BaseModel):
     patient_id: UUID
-    bed_code: str
-    ward_code: str
-    diagnosis_code: str
-    admission_profile: dict[str, Any]
+    bed_id: UUID
+    diagnosis_id: Optional[UUID] = None
+    admission_profile: dict[str, Any] = Field(default_factory=dict)
 
 
 
@@ -330,7 +330,9 @@ def api_backlog_create(module_code: str, payload: ModuleRecordCreate, ctx: AuthC
 @router.get("/clinical/ipd-admissions")
 def list_ipd(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     rows = db.query(m.IpdAdmission).filter(m.IpdAdmission.tenant_id == ctx.tenant_id).all()
-    return [{"id": str(r.id), "admission_no": r.admission_no, "bed_code": r.bed_code,
+    return [{"id": str(r.id), "admission_no": r.admission_no,
+             "bed_id": str(r.bed_id) if r.bed_id else None, "bed_code": r.bed_code,
+             "ward_id": str(r.ward_id) if r.ward_id else None,
              "ward_code": r.ward_code, "diagnosis_code": r.diagnosis_code, "status": r.status,
              "patient_id": str(r.patient_id), "admission_profile": r.admission_profile or {}} for r in rows]
 
@@ -342,13 +344,38 @@ def admit_ipd(
     db: Session = Depends(get_db),
 ):
     profile = validate_clinical_profile("ipd", payload.admission_profile)
-    bed = db.query(m.Bed).filter(m.Bed.tenant_id == ctx.tenant_id, m.Bed.bed_code == payload.bed_code, m.Bed.status == "available").first()
+    patient = db.query(m.Patient).filter(
+        m.Patient.id == payload.patient_id, m.Patient.tenant_id == ctx.tenant_id,
+        m.Patient.is_deleted == False,
+    ).first()
+    if not patient:
+        raise HTTPException(400, "Select a valid patient")
+    bed = db.query(m.Bed).filter(
+        m.Bed.id == payload.bed_id, m.Bed.tenant_id == ctx.tenant_id,
+        m.Bed.is_deleted == False, m.Bed.status == "available",
+    ).first()
     if not bed:
-        raise HTTPException(400, "Bed not available — check bed master")
+        raise HTTPException(400, "Selected bed is not available")
+    if not bed.room_id:
+        raise HTTPException(400, "Bed must be linked to a room master before admission")
+    room = _location(db, ctx.tenant_id, bed.room_id, expected_type="room")
+    ward = _ancestor(db, ctx.tenant_id, room, "ward")
+    if not ward:
+        raise HTTPException(400, "Bed room must be linked through the facility hierarchy to a ward")
+    diagnosis = None
+    if payload.diagnosis_id:
+        diagnosis = db.query(m.Disease).filter(
+            m.Disease.id == payload.diagnosis_id,
+            or_(m.Disease.tenant_id == ctx.tenant_id, m.Disease.tenant_id.is_(None)),
+            m.Disease.is_deleted == False,
+        ).first()
+        if not diagnosis:
+            raise HTTPException(400, "Select a valid diagnosis master")
     n = db.query(m.IpdAdmission).filter(m.IpdAdmission.tenant_id == ctx.tenant_id).count() + 1
     row = m.IpdAdmission(
         tenant_id=ctx.tenant_id, patient_id=payload.patient_id, admission_no=f"IPD-{n:06d}",
-        bed_code=payload.bed_code, ward_code=payload.ward_code, diagnosis_code=payload.diagnosis_code,
+        bed_id=bed.id, ward_id=ward.id, bed_code=bed.bed_code, ward_code=ward.code,
+        diagnosis_code=(diagnosis.icd_code or diagnosis.code) if diagnosis else None,
         admission_profile=profile,
         created_by=ctx.user.id, updated_by=ctx.user.id,
     )
@@ -450,7 +477,7 @@ def list_room_categories(ctx: AuthContext = Depends(resolve_tenant_context), db:
 @router.get("/admin/beds")
 def list_beds(ctx: AuthContext = Depends(resolve_tenant_context), db: Session = Depends(get_db)):
     rows = db.query(m.Bed).filter(m.Bed.tenant_id == ctx.tenant_id).all()
-    return [{"id": str(r.id), "bed_code": r.bed_code, "room_code": r.room_code, "status": r.status, "category_code": r.category_code} for r in rows]
+    return [serialize_bed(db, ctx.tenant_id, r) for r in rows]
 
 
 @router.patch("/admin/beds/{bed_id}")
@@ -463,9 +490,19 @@ def patch_bed(
     row = db.query(m.Bed).filter(m.Bed.id == bed_id, m.Bed.tenant_id == ctx.tenant_id).first()
     if not row:
         raise HTTPException(404, "Bed not found")
-    allowed = {"available", "occupied", "maintenance", "housekeeping"}
+    allowed = {"available", "occupied", "reserved", "maintenance", "housekeeping", "blocked"}
     if status not in allowed:
         raise HTTPException(400, f"Status must be one of: {sorted(allowed)}")
+    if status == "occupied" and row.status != "occupied":
+        raise HTTPException(400, "Bed occupancy is set only by the admission workflow")
+    if row.status == "occupied" and status != "occupied":
+        active = db.query(m.IpdAdmission).filter(
+            m.IpdAdmission.tenant_id == ctx.tenant_id,
+            m.IpdAdmission.bed_id == row.id,
+            m.IpdAdmission.status != "discharged",
+        ).first()
+        if active:
+            raise HTTPException(409, "Bed has an active admission; discharge or transfer the patient first")
     row.status = status
     row.updated_by = ctx.user.id
     db.commit()

@@ -45,7 +45,7 @@ class MfaVerifyRequest(BaseModel):
 class DepartmentCreate(BaseModel):
     code: str
     name: str
-    branch_id: Optional[UUID] = None
+    branch_id: UUID
 
 
 class UserCreate(BaseModel):
@@ -218,9 +218,11 @@ class PatientOut(BaseModel):
 class ProviderCreate(BaseModel):
     code: str
     full_name: str
-    specialty_code: Optional[str] = None
+    specialty_code: str
     license_no: Optional[str] = None
-    branch_id: Optional[UUID] = None
+    branch_id: UUID
+    department_id: UUID
+    primary_location_id: UUID
     consultation_fee_code: Optional[str] = None
 
 
@@ -230,6 +232,9 @@ class ProviderOut(BaseModel):
     full_name: str
     specialty_code: Optional[str]
     status: str
+    branch_id: Optional[UUID]
+    department_id: Optional[UUID]
+    primary_location_id: Optional[UUID]
 
     class Config:
         from_attributes = True
@@ -255,7 +260,7 @@ class AppointmentCreate(BaseModel):
     @model_validator(mode="after")
     def validate_booking_profile(self):
         required = (
-            "visit_type", "department_code", "priority", "duration_minutes",
+            "visit_type", "department_id", "priority", "duration_minutes",
             "referral_source", "payer_type", "callback_phone",
         )
         missing = [key for key in required if self.booking_profile.get(key) in (None, "")]

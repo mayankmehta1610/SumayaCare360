@@ -5,20 +5,26 @@ import ModuleFlowBar from "../components/ModuleFlowBar";
 export default function ProvidersPage() {
   const [rows, setRows] = useState<any[]>([]);
   const [specialties, setSpecialties] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [schedules, setSchedules] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
-  const [form, setForm] = useState({ code: "", full_name: "", specialty_code: "", license_no: "" });
+  const [form, setForm] = useState({ code: "", full_name: "", specialty_code: "", license_no: "", branch_id: "", department_id: "", primary_location_id: "" });
   const [schedForm, setSchedForm] = useState({ day_of_week: 1, start_time: "09:00", end_time: "17:00", slot_minutes: 15, mode: "in_person" });
 
   async function load() {
-    const [providers, specs] = await Promise.all([
+    const [providers, specs, branchRows, departmentRows, locationRows] = await Promise.all([
       api<any[]>("/providers"),
       api<any[]>("/masters/specialties"),
+      api<any[]>("/admin/branches"), api<any[]>("/admin/departments"), api<any[]>("/admin/facility-locations"),
     ]);
     setRows(providers);
     setSpecialties(specs);
+    setBranches(branchRows); setDepartments(departmentRows); setLocations(locationRows);
+    setForm((x) => ({ ...x, branch_id: x.branch_id || branchRows[0]?.id || "" }));
   }
 
   useEffect(() => {
@@ -35,7 +41,7 @@ export default function ProvidersPage() {
     try {
       await api("/providers", { method: "POST", body: JSON.stringify(form) });
       setMsg("Provider created");
-      setForm({ code: "", full_name: "", specialty_code: "", license_no: "" });
+      setForm((x) => ({ code: "", full_name: "", specialty_code: "", license_no: "", branch_id: x.branch_id, department_id: "", primary_location_id: "" }));
       await load();
     } catch (err: any) {
       setError(err.message);
@@ -62,6 +68,9 @@ export default function ProvidersPage() {
           <h3 style={{ marginTop: 0 }}>Add provider</h3>
           <div className="field"><label>Code</label><input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></div>
           <div className="field"><label>Full name</label><input required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
+          <div className="field"><label>Branch / campus (master)</label><select required value={form.branch_id} onChange={(e) => setForm({ ...form, branch_id: e.target.value, department_id: "", primary_location_id: "" })}><option value="">Select</option>{branches.map((x) => <option key={x.id} value={x.id}>{x.code} ? {x.name}</option>)}</select></div>
+          <div className="field"><label>Department (master)</label><select required value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}><option value="">Select</option>{departments.filter((x) => x.branch_id === form.branch_id).map((x) => <option key={x.id} value={x.id}>{x.code} ? {x.name}</option>)}</select></div>
+          <div className="field"><label>Primary service location</label><select required value={form.primary_location_id} onChange={(e) => setForm({ ...form, primary_location_id: e.target.value })}><option value="">Select from facility hierarchy</option>{locations.filter((x) => x.branch_id === form.branch_id && x.location_type === "room").map((x) => <option key={x.id} value={x.id}>{x.path_label}</option>)}</select></div>
           <div className="field">
             <label>Specialty (from master)</label>
             <select required value={form.specialty_code} onChange={(e) => setForm({ ...form, specialty_code: e.target.value })}>

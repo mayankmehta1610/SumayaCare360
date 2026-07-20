@@ -12,7 +12,7 @@ export default function AdministrationPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [branchForm, setBranchForm] = useState({ code: "", name: "", city: "" });
-  const [deptForm, setDeptForm] = useState({ code: "", name: "" });
+  const [deptForm, setDeptForm] = useState({ code: "", name: "", branch_id: "" });
 
   async function load() {
     const [b, d, u, bd, r] = await Promise.all([
@@ -23,6 +23,7 @@ export default function AdministrationPage() {
       api<any[]>("/admin/room-categories"),
     ]);
     setBranches(b);
+    setDeptForm((x) => ({ ...x, branch_id: x.branch_id || b[0]?.id || "" }));
     setDepartments(d);
     setUsers(u);
     setBeds(bd);
@@ -45,7 +46,7 @@ export default function AdministrationPage() {
     e.preventDefault();
     await api("/admin/departments", { method: "POST", body: JSON.stringify(deptForm) });
     setMsg("Department created");
-    setDeptForm({ code: "", name: "" });
+    setDeptForm((x) => ({ code: "", name: "", branch_id: x.branch_id }));
     await load();
   }
 
@@ -77,6 +78,7 @@ export default function AdministrationPage() {
         <form className="card" onSubmit={(e) => addDept(e).catch((err) => setError(err.message))}>
           <h3 style={{ marginTop: 0 }}>Add department</h3>
           <div className="field"><label>Code</label><input required value={deptForm.code} onChange={(e) => setDeptForm({ ...deptForm, code: e.target.value })} /></div>
+          <div className="field"><label>Branch / campus</label><select required value={deptForm.branch_id} onChange={(e) => setDeptForm({ ...deptForm, branch_id: e.target.value })}><option value="">Select</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.code} ? {b.name}</option>)}</select></div>
           <div className="field"><label>Name</label><input required value={deptForm.name} onChange={(e) => setDeptForm({ ...deptForm, name: e.target.value })} /></div>
           <button type="submit">Save department</button>
         </form>
@@ -89,8 +91,8 @@ export default function AdministrationPage() {
         </div>
         <div className="card table-wrap">
           <h3 style={{ marginTop: 0 }}>Departments</h3>
-          <table><thead><tr><th>Code</th><th>Name</th></tr></thead>
-            <tbody>{departments.map((d) => <tr key={d.id}><td>{d.code}</td><td>{d.name}</td></tr>)}</tbody></table>
+          <table><thead><tr><th>Code</th><th>Name</th><th>Branch / campus</th></tr></thead>
+            <tbody>{departments.map((d) => <tr key={d.id}><td>{d.code}</td><td>{d.name}</td><td>{branches.find((b) => b.id === d.branch_id)?.name || "?"}</td></tr>)}</tbody></table>
         </div>
       </div>
     </div>

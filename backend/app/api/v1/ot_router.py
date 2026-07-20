@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -11,15 +11,15 @@ from app.core.deps import AuthContext, require_tenant
 from app.data.clinical_profiles import validate_clinical_profile
 from app.db.session import get_db
 from app.services import ot_domains as ot
+from app.models import entities as m
 
 router = APIRouter(prefix="/ot", tags=["operation-theatre"])
 
 
 class OtCreate(BaseModel):
     patient_id: UUID
-    procedure_code: str
-    procedure_name: str
-    theatre_code: str = ""
+    procedure_tariff_id: UUID
+    theatre_id: UUID
     surgeon_id: Optional[UUID] = None
     scheduled_at: Optional[datetime] = None
     procedure_profile: dict[str, Any]
@@ -46,13 +46,18 @@ def create_procedure(
     db: Session = Depends(get_db),
 ):
     profile = validate_clinical_profile("operation_theatre", payload.procedure_profile)
+    tariff = db.query(m.Tariff).filter(m.Tariff.id == payload.procedure_tariff_id, m.Tariff.tenant_id == ctx.tenant_id, m.Tariff.is_deleted == False).first()
+    theatre = db.query(m.FacilityLocation).filter(m.FacilityLocation.id == payload.theatre_id, m.FacilityLocation.tenant_id == ctx.tenant_id, m.FacilityLocation.location_type == "room", m.FacilityLocation.is_deleted == False).first()
+    if not tariff or tariff.category not in {"procedure", "surgery"}:
+        raise HTTPException(400, "Select a valid procedure / surgery tariff master")
+    if not theatre or (theatre.attributes or {}).get("service_type") != "operation_theatre":
+        raise HTTPException(400, "Select a room designated as an operation theatre")
     row = ot.create_ot_procedure(
         db,
         tenant_id=ctx.tenant_id,
         patient_id=payload.patient_id,
-        procedure_code=payload.procedure_code,
-        procedure_name=payload.procedure_name,
-        theatre_code=payload.theatre_code,
+        procedure_tariff_id=tariff.id, procedure_code=tariff.code, procedure_name=tariff.name,
+        theatre_id=theatre.id, theatre_code=theatre.code,
         surgeon_id=payload.surgeon_id,
         scheduled_at=payload.scheduled_at,
         procedure_profile=profile,

@@ -55,6 +55,26 @@ class Department(Base, AuditedMixin):
     status = Column(String(32), default="active")
 
 
+class FacilityLocation(Base, AuditedMixin):
+    """Governed physical-location hierarchy below a hospital branch/campus."""
+    __tablename__ = "facility_locations"
+    tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
+    branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=False, index=True)
+    parent_id = Column(GUID(), ForeignKey("facility_locations.id"), nullable=True, index=True)
+    department_id = Column(GUID(), ForeignKey("departments.id"), nullable=True)
+    room_category_id = Column(GUID(), ForeignKey("room_categories.id"), nullable=True)
+    location_type = Column(String(32), nullable=False, index=True)
+    code = Column(String(64), nullable=False)
+    name = Column(String(255), nullable=False)
+    status = Column(String(32), default="active", nullable=False)
+    operational_status = Column(String(32), default="operational", nullable=False)
+    attributes = Column(JSON, default=dict)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "branch_id", "code", name="uq_facility_location_code"),
+        Index("ix_facility_location_tree", "tenant_id", "branch_id", "parent_id", "location_type"),
+    )
+
+
 class Role(Base, AuditedMixin):
     __tablename__ = "roles"
     tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=True, index=True)
@@ -239,6 +259,8 @@ class Provider(Base, AuditedMixin):
     __tablename__ = "providers"
     tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
+    department_id = Column(GUID(), ForeignKey("departments.id"), nullable=True)
+    primary_location_id = Column(GUID(), ForeignKey("facility_locations.id"), nullable=True)
     user_id = Column(GUID(), ForeignKey("users.id"), nullable=True)
     code = Column(String(64), nullable=False)
     full_name = Column(String(255), nullable=False)
@@ -510,6 +532,8 @@ class Bed(Base, AuditedMixin):
     __tablename__ = "beds"
     tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     branch_id = Column(GUID(), ForeignKey("branches.id"), nullable=True)
+    room_id = Column(GUID(), ForeignKey("facility_locations.id"), nullable=True, index=True)
+    room_category_id = Column(GUID(), ForeignKey("room_categories.id"), nullable=True)
     room_code = Column(String(64), nullable=False)
     bed_code = Column(String(64), nullable=False)
     category_code = Column(String(64))
@@ -611,6 +635,8 @@ class IpdAdmission(Base, AuditedMixin):
     __tablename__ = "ipd_admissions"
     tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False)
+    bed_id = Column(GUID(), ForeignKey("beds.id"), nullable=True, index=True)
+    ward_id = Column(GUID(), ForeignKey("facility_locations.id"), nullable=True)
     admission_no = Column(String(64), nullable=False)
     bed_code = Column(String(64))
     ward_code = Column(String(64))
@@ -748,6 +774,8 @@ class OtProcedure(Base, AuditedMixin):
     __tablename__ = "ot_procedures"
     tenant_id = Column(GUID(), ForeignKey("tenants.id"), nullable=False, index=True)
     patient_id = Column(GUID(), ForeignKey("patients.id"), nullable=False, index=True)
+    procedure_tariff_id = Column(GUID(), ForeignKey("tariffs.id"), nullable=True)
+    theatre_id = Column(GUID(), ForeignKey("facility_locations.id"), nullable=True)
     procedure_no = Column(String(64), nullable=False)
     procedure_code = Column(String(64), nullable=False)
     procedure_name = Column(String(255), nullable=False)

@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import { api } from "../api/client";
+
 export type ClinicalProfileType =
   | "emergency" | "ipd" | "nursing" | "laboratory" | "radiology"
   | "pharmacy" | "operation_theatre" | "insurance_claim";
@@ -13,6 +16,7 @@ type Field = {
   min?: number;
   max?: number;
   wide?: boolean;
+  source?: "providers" | "facility";
 };
 
 const yesNo = ["no", "yes"];
@@ -37,7 +41,7 @@ export const CLINICAL_PROFILE_FIELDS: Record<ClinicalProfileType, Field[]> = {
   ],
   ipd: [
     { key: "admission_type", label: "Admission type", type: "select", options: ["emergency", "elective", "day_care", "transfer"], defaultValue: "elective" },
-    { key: "admitting_provider", label: "Admitting provider" },
+    { key: "admitting_provider", label: "Admitting provider", type: "select", source: "providers" },
     { key: "admission_reason", label: "Clinical reason for admission", type: "textarea", wide: true },
     { key: "acuity", label: "Clinical acuity", type: "select", options: ["stable", "moderate", "high_dependency", "critical"], defaultValue: "stable" },
     { key: "diet_order", label: "Diet order", type: "select", options: ["regular", "diabetic", "low_salt", "renal", "npo", "liquid", "paediatric"], defaultValue: "regular" },
@@ -63,7 +67,7 @@ export const CLINICAL_PROFILE_FIELDS: Record<ClinicalProfileType, Field[]> = {
     { key: "clinical_indication", label: "Clinical indication", type: "textarea", wide: true },
     { key: "specimen_type", label: "Specimen type", type: "select", options: ["blood", "urine", "serum", "plasma", "swab", "sputum", "stool", "tissue", "other"], defaultValue: "blood" },
     { key: "fasting_status", label: "Fasting status", type: "select", options: ["not_required", "confirmed", "not_confirmed"], defaultValue: "not_required" },
-    { key: "collection_location", label: "Collection location", type: "select", options: ["outpatient", "ward", "emergency", "icu", "home_collection"], defaultValue: "outpatient" },
+    { key: "collection_location", label: "Collection location", type: "select", source: "facility" },
     { key: "infection_risk", label: "Infection risk", type: "select", options: ["none", "suspected", "confirmed"], defaultValue: "none" },
     { key: "billing_status", label: "Billing clearance", type: "select", options: ["cleared", "credit_authorised", "emergency_override"], defaultValue: "cleared" },
   ],
@@ -123,6 +127,12 @@ export default function ClinicalProfileFields({ type, values, onChange }: {
   values: ClinicalProfileValues;
   onChange: (values: ClinicalProfileValues) => void;
 }) {
+  const [sourceOptions, setSourceOptions] = useState<Record<string, { value: string; label: string }[]>>({});
+  useEffect(() => {
+    const fields = CLINICAL_PROFILE_FIELDS[type];
+    if (fields.some((x) => x.source === "providers")) api<any[]>("/providers").then((rows) => setSourceOptions((x) => ({ ...x, providers: rows.filter((r) => r.status === "active").map((r) => ({ value: r.id, label: `${r.full_name} ? ${r.specialty_code || "Provider"}` })) }))).catch(() => undefined);
+    if (fields.some((x) => x.source === "facility")) api<any[]>("/admin/facility-locations").then((rows) => setSourceOptions((x) => ({ ...x, facility: rows.filter((r) => ["ward", "room"].includes(r.location_type) && r.status === "active").map((r) => ({ value: r.id, label: r.path_label })) }))).catch(() => undefined);
+  }, [type]);
   const set = (key: string, value: string | boolean) => onChange({ ...values, [key]: value });
   return (
     <fieldset className="clinical-profile">
@@ -136,7 +146,7 @@ export default function ClinicalProfileFields({ type, values, onChange }: {
               <>
                 <label>{field.label} *</label>
                 {field.type === "select" ? (
-                  <select required value={String(values[field.key] ?? "")} onChange={(e) => set(field.key, e.target.value)}>{field.options?.map((option) => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}</select>
+                  <select required value={String(values[field.key] ?? "")} onChange={(e) => set(field.key, e.target.value)}>{field.source && <option value="">Select from master</option>}{field.source ? sourceOptions[field.source]?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>) : field.options?.map((option) => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}</select>
                 ) : field.type === "textarea" ? (
                   <textarea required rows={2} value={String(values[field.key] ?? "")} onChange={(e) => set(field.key, e.target.value)} />
                 ) : (

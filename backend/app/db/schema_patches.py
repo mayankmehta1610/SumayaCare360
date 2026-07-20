@@ -38,6 +38,14 @@ SCHEMA_PATCHES: list[tuple[str, str, str, str]] = [
     ("insurance_claims", "pre_auth_no", "VARCHAR(128)", "VARCHAR(128)"),
     ("insurance_claims", "policy_no", "VARCHAR(128)", "VARCHAR(128)"),
     ("insurance_claims", "notes", "TEXT", "TEXT"),
+    ("beds", "room_id", "VARCHAR(36)", "UUID"),
+    ("beds", "room_category_id", "VARCHAR(36)", "UUID"),
+    ("ipd_admissions", "bed_id", "VARCHAR(36)", "UUID"),
+    ("ipd_admissions", "ward_id", "VARCHAR(36)", "UUID"),
+    ("providers", "department_id", "VARCHAR(36)", "UUID"),
+    ("providers", "primary_location_id", "VARCHAR(36)", "UUID"),
+    ("ot_procedures", "procedure_tariff_id", "VARCHAR(36)", "UUID"),
+    ("ot_procedures", "theatre_id", "VARCHAR(36)", "UUID"),
 ]
 
 

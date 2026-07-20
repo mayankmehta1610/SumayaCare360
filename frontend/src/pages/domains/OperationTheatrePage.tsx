@@ -24,10 +24,12 @@ const NEXT: Record<string, string> = {
 
 export default function OperationTheatrePage() {
   const [patients, setPatients] = useState<any[]>([]);
+  const [procedures, setProcedures] = useState<any[]>([]);
+  const [theatres, setTheatres] = useState<any[]>([]);
   const [rows, setRows] = useState<OtProc[]>([]);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
-  const [form, setForm] = useState({ patient_id: "", procedure_code: "", procedure_name: "", theatre_code: "OT-1" });
+  const [form, setForm] = useState({ patient_id: "", procedure_tariff_id: "", theatre_id: "" });
   const [procedureProfile, setProcedureProfile] = useState(() => createClinicalProfile("operation_theatre"));
 
   const patientMap = useMemo(() => {
@@ -37,13 +39,17 @@ export default function OperationTheatrePage() {
   }, [patients]);
 
   async function load() {
-    const [p, o] = await Promise.all([
+    const [p, o, tariffRows, locationRows] = await Promise.all([
       fetchPatients(),
       api<OtProc[]>("/ot/procedures"),
+      api<any[]>("/masters/tariffs"),
+      api<any[]>("/admin/facility-locations"),
     ]);
     setPatients(p);
     setRows(o);
   }
+    setProcedures(tariffRows.filter((x) => ["procedure", "surgery"].includes(x.category) && x.status === "active"));
+    setTheatres(locationRows.filter((x) => x.location_type === "room" && x.attributes?.service_type === "operation_theatre" && x.status === "active"));
 
   useEffect(() => {
     load().catch((e) => setError(e.message));
@@ -99,18 +105,14 @@ export default function OperationTheatrePage() {
             </select>
           </div>
           <div className="field">
-            <label>Theatre</label>
-            <input value={form.theatre_code} onChange={(e) => setForm({ ...form, theatre_code: e.target.value })} />
+            <label>Operation theatre (facility master)</label>
+            <select required value={form.theatre_id} onChange={(e) => setForm({ ...form, theatre_id: e.target.value })}><option value="">Select theatre</option>{theatres.map((x) => <option key={x.id} value={x.id}>{x.path_label}</option>)}</select>
           </div>
         </div>
         <div className="grid-2">
           <div className="field">
-            <label>Procedure code</label>
-            <input required value={form.procedure_code} onChange={(e) => setForm({ ...form, procedure_code: e.target.value })} />
-          </div>
-          <div className="field">
-            <label>Procedure name</label>
-            <input required value={form.procedure_name} onChange={(e) => setForm({ ...form, procedure_name: e.target.value })} />
+            <label>Procedure / surgery (tariff master)</label>
+            <select required value={form.procedure_tariff_id} onChange={(e) => setForm({ ...form, procedure_tariff_id: e.target.value })}><option value="">Select procedure</option>{procedures.map((x) => <option key={x.id} value={x.id}>{x.code} ? {x.name}</option>)}</select>
           </div>
         </div>
         <button type="submit">Schedule</button>
