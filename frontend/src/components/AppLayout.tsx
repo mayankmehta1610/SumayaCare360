@@ -1,6 +1,6 @@
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useMemo } from "react";
-import { LogOut } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import BrandLogo from "./ui/BrandLogo";
 import NavIcon, { normalizeRoute } from "./ui/NavIcon";
@@ -15,13 +15,33 @@ export default function AppLayout() {
   const { session, navigation, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("sc360_sidebar_collapsed") === "true",
+  );
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const prefix = session?.tenant_code ? `/${session.tenant_code}` : "";
   const currentRoute = stripTenantPrefix(location.pathname, session?.tenant_code);
 
-  if (session && navigation && !canAccessRouteSession(session, navigation, currentRoute)) {
-    return <Navigate to={`${prefix}${homeRouteForRole(navigation)}`} replace />;
-  }
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    localStorage.setItem("sc360_sidebar_collapsed", String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    document.body.classList.toggle("mobile-nav-open", mobileMenuOpen);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.classList.remove("mobile-nav-open");
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileMenuOpen]);
 
   const nav = useMemo(() => {
     if (!navigation) return [];
@@ -77,6 +97,10 @@ export default function AppLayout() {
     return groups;
   }, [navigation, prefix, session?.role_code]);
 
+  if (session && navigation && !canAccessRouteSession(session, navigation, currentRoute)) {
+    return <Navigate to={`${prefix}${homeRouteForRole(navigation)}`} replace />;
+  }
+
   const initials = session?.full_name
     ?.split(" ")
     .map((n) => n[0])
@@ -87,11 +111,23 @@ export default function AppLayout() {
   const roleLabel = session?.role_code?.replace(/_/g, " ") || "";
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={`app-shell ${sidebarCollapsed ? "app-shell--collapsed" : ""}`}>
+      <button
+        type="button"
+        className={`sidebar-backdrop ${mobileMenuOpen ? "is-visible" : ""}`}
+        aria-label="Close navigation"
+        tabIndex={mobileMenuOpen ? 0 : -1}
+        onClick={() => setMobileMenuOpen(false)}
+      />
+      <aside id="primary-navigation" className={`sidebar ${mobileMenuOpen ? "sidebar--mobile-open" : ""}`}>
         <div className="sidebar__head">
-          <BrandLogo />
-          <div className="brand-sub">
+          <div className="sidebar__brand-row">
+            <BrandLogo />
+            <button type="button" className="sidebar__mobile-close" aria-label="Close navigation" onClick={() => setMobileMenuOpen(false)}>
+              <X size={20} />
+            </button>
+          </div>
+          <div className="brand-sub sidebar__label">
             {session?.tenant_code ? (
               <span className="tenant-pill">/{session.tenant_code}</span>
             ) : (
@@ -108,18 +144,44 @@ export default function AppLayout() {
             <div key={group.key} className="nav-group">
               <div className="nav-cat">{group.label}</div>
               {group.items.map((l) => (
-                <NavLink key={l.to} to={l.to} className={({ isActive }) => (isActive ? "active" : "")}>
+                <NavLink
+                  key={l.to}
+                  to={l.to}
+                  title={sidebarCollapsed ? l.label : undefined}
+                  aria-label={sidebarCollapsed ? l.label : undefined}
+                  className={({ isActive }) => (isActive ? "active" : "")}
+                >
                   <NavIcon route={normalizeRoute(l.route)} className="nav-icon" size={17} />
-                  <span>{l.label}</span>
+                  <span className="sidebar__label">{l.label}</span>
                 </NavLink>
               ))}
             </div>
           ))}
         </nav>
+        <button
+          type="button"
+          className="sidebar__collapse"
+          aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
+          aria-expanded={!sidebarCollapsed}
+          onClick={() => setSidebarCollapsed((value) => !value)}
+        >
+          {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          <span className="sidebar__label">Collapse menu</span>
+        </button>
       </aside>
       <main className="main">
         <div className="topbar">
           <div className="topbar__left">
+            <button
+              type="button"
+              className="topbar__menu"
+              aria-label="Open navigation"
+              aria-controls="primary-navigation"
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
             <span className="topbar__title">Hospital operations <small>{roleLabel} workspace</small></span>
           </div>
           <div className="topbar__user">
@@ -129,7 +191,7 @@ export default function AppLayout() {
             </div>
             <button type="button" className="secondary" onClick={() => { logout(); navigate("/login"); }}>
               <LogOut size={16} style={{ verticalAlign: "middle", marginRight: "0.35rem" }} />
-              Sign out
+              <span className="signout__label">Sign out</span>
             </button>
           </div>
         </div>

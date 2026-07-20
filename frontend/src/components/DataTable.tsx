@@ -85,7 +85,7 @@ export default function DataTable<T>({
           {loading ? "Loading…" : `${from}–${to} of ${total}`}
         </span>
       </div>
-      <table>
+      <table className="data-table">
         <thead>
           <tr>
             {columns.map((c) => <th key={c.key}>{c.label}</th>)}
@@ -94,14 +94,14 @@ export default function DataTable<T>({
         </thead>
         <tbody>
           {rows.length === 0 && !loading && (
-            <tr><td colSpan={columns.length + (renderActions ? 1 : 0)} className="muted">{emptyMessage}</td></tr>
+            <tr className="data-table__empty"><td colSpan={columns.length + (renderActions ? 1 : 0)} className="muted">{emptyMessage}</td></tr>
           )}
           {rows.map((row) => (
             <tr key={rowKey(row)}>
               {columns.map((c) => (
-                <td key={c.key}>{c.render ? c.render(row) : String((row as Record<string, unknown>)[c.key] ?? "—")}</td>
+                <td key={c.key} data-label={c.label}>{c.render ? c.render(row) : String((row as Record<string, unknown>)[c.key] ?? "—")}</td>
               ))}
-              {renderActions && <td className="actions" style={{ flexWrap: "wrap" }}>{renderActions(row)}</td>}
+              {renderActions && <td data-label="Actions" className="actions data-table__actions" style={{ flexWrap: "wrap" }}>{renderActions(row)}</td>}
             </tr>
           ))}
         </tbody>
